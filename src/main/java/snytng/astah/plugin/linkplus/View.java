@@ -250,6 +250,10 @@ ProjectEventListener
 	}
 
 	private boolean filterLabel(String label, String keyword) {
+		if(label == null || keyword == null){
+			return false;
+		}
+		
 		if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_STARTSWITH)) {
 			return label.toLowerCase().startsWith(keyword.toLowerCase());
 
