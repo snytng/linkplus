@@ -23,12 +23,11 @@ import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.ScrollPaneConstants;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableModel;
 
 import com.change_vision.jude.api.inf.AstahAPI;
 import com.change_vision.jude.api.inf.model.IDiagram;
+import com.change_vision.jude.api.inf.model.IMindMapDiagram;
 import com.change_vision.jude.api.inf.model.INamedElement;
 import com.change_vision.jude.api.inf.model.IPackage;
 import com.change_vision.jude.api.inf.presentation.INodePresentation;
@@ -121,11 +120,17 @@ ProjectEventListener
 			this.diagram = diagram;
 		}
 	}
-	private List<Link> links = new ArrayList<>();
+
+	private transient List<Link> links = new ArrayList<>();
 
 	private String[] columnNames = new String[]{"ノート", "属性", "ダイアグラム"};
 
-	private DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0);
+	private DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
+		// セル編集できないようにする
+		@Override public boolean isCellEditable(int row, int column) {
+			return false;
+		}
+	};
 
 	public Container createPane() {
 
@@ -134,18 +139,14 @@ ProjectEventListener
 		notesTable.setAutoCreateRowSorter(true);
 		notesTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
 		notesTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-		// TODO 編集できないようにする
 
 		ListSelectionModel selectionModel = notesTable.getSelectionModel();
-		selectionModel.addListSelectionListener(new ListSelectionListener() {
-			@Override
-			public void valueChanged(ListSelectionEvent e) {
-			    if (e.getValueIsAdjusting()) {
-			        return;
-			    }
-			    showDiagram();
-			    notesTable.requestFocusInWindow();
+		selectionModel.addListSelectionListener(e -> {
+			if (e.getValueIsAdjusting()) {
+				return;
 			}
+			showDiagram();
+			notesTable.requestFocusInWindow();
 		});
 
 		scrollPane = new JScrollPane(
@@ -157,7 +158,7 @@ ProjectEventListener
 		menuPanel.setLayout(new BorderLayout());
 
 		JPanel prefixPanel = new JPanel();
-		JLabel prefixLabel = new JLabel("文字列");
+		JLabel prefixLabel = new JLabel("キーワード");
 		prefixTextField = new JTextField("TODO", 10);
 		prefixTextField.addKeyListener(new KeyListener() {
 			@Override
@@ -199,7 +200,7 @@ ProjectEventListener
 		diagramViewManager.open(links.get(row).diagram);
 		if(col == 0) {
 			diagramViewManager.showInDiagramEditor(links.get(row).node);
-			diagramViewManager.unselectAll();
+			//diagramViewManager.unselectAll();
 		}
 	}
 
@@ -216,15 +217,25 @@ ProjectEventListener
 			.collect(Collectors.toList());
 
 			for(IDiagram d : ds) {
+				// ノートを追加
 				Stream.of(d.getPresentations())
 				.filter(INodePresentation.class::isInstance)
 				.map(INodePresentation.class::cast)
 				.filter(np -> np.getType().equals("Note"))
 				.filter(np -> np.getLabel().toLowerCase().startsWith(prefix.toLowerCase()))
-				.forEach(np -> {
-					links.add(new Link(np, d));
-				});
+				.forEach(np -> links.add(new Link(np, d)));
+
+				// マインドマップのノードを追加
+				if(d instanceof IMindMapDiagram) {
+					Stream.of(d.getPresentations())
+					.filter(INodePresentation.class::isInstance)
+					.map(INodePresentation.class::cast)
+					.filter(np -> np.getLabel().toLowerCase().startsWith(prefix.toLowerCase()))
+					.forEach(np -> links.add(new Link(np, d)));
+				}
 			}
+
+
 
 		}catch(Exception e) {
 			e.printStackTrace();
@@ -253,7 +264,7 @@ ProjectEventListener
 
 			tableModel.setRowCount(0);
 
-			System.out.println("links.size=" + links.size());
+			logger.log(Level.INFO, () -> "links.size=" + links.size());
 			links.stream()
 			.map(l -> new String[] {l.node.getLabel(), l.node.getType(), l.diagram.getName()})
 			.forEach(tableModel::addRow);
@@ -270,8 +281,7 @@ ProjectEventListener
 	 */
 	@Override
 	public void diagramSelectionChanged(IDiagramEditorSelectionEvent e) {
-		//logger.log(Level.INFO, "diagramSelectionChanged");
-		//updateDiagramView();
+		logger.log(Level.INFO, "diagramSelectionChanged");
 	}
 
 	/**
@@ -279,8 +289,7 @@ ProjectEventListener
 	 */
 	@Override
 	public void entitySelectionChanged(IEntitySelectionEvent e) {
-		//logger.log(Level.INFO, "entitySelectionChanged");
-		//updateDiagramView();
+		logger.log(Level.INFO, "entitySelectionChanged");
 	}
 
 	// ProjectEventListener
@@ -314,7 +323,7 @@ ProjectEventListener
 	public void activated() {
 		// リスナーへの登録
 		addDiagramListeners();
-
+		// 再表示されたら表示を更新
 		updateDiagramView();
 	}
 
