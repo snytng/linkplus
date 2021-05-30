@@ -4,8 +4,8 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.GridLayout;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -21,7 +21,10 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableModel;
 
 import com.change_vision.jude.api.inf.AstahAPI;
@@ -56,7 +59,7 @@ ProjectEventListener
 	static final Logger logger = Logger.getLogger(View.class.getName());
 	static {
 		ConsoleHandler consoleHandler = new ConsoleHandler();
-		consoleHandler.setLevel(Level.CONFIG);
+		consoleHandler.setLevel(Level.INFO);
 		logger.addHandler(consoleHandler);
 		logger.setUseParentHandlers(false);
 	}
@@ -130,20 +133,19 @@ ProjectEventListener
 		notesTable.setColumnSelectionAllowed(true);
 		notesTable.setAutoCreateRowSorter(true);
 		notesTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+		notesTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		// TODO 編集できないようにする
 
-		notesTable.addMouseListener(new MouseAdapter() {
-		    @Override
-		    public void mouseReleased(MouseEvent e) {
-				// 選択行の行番号を取得します
-				int row = notesTable.getSelectedRow();
-				int col = notesTable.getSelectedColumn();
-				System.out.println("行" + row + "::" + "列" + col);
-
-				diagramViewManager.open(links.get(row).diagram);
-				if(col == 0) {
-					diagramViewManager.showInDiagramEditor(links.get(row).node);
-				}
-		    }
+		ListSelectionModel selectionModel = notesTable.getSelectionModel();
+		selectionModel.addListSelectionListener(new ListSelectionListener() {
+			@Override
+			public void valueChanged(ListSelectionEvent e) {
+			    if (e.getValueIsAdjusting()) {
+			        return;
+			    }
+			    showDiagram();
+			    notesTable.requestFocusInWindow();
+			}
 		});
 
 		scrollPane = new JScrollPane(
@@ -157,6 +159,22 @@ ProjectEventListener
 		JPanel prefixPanel = new JPanel();
 		JLabel prefixLabel = new JLabel("文字列");
 		prefixTextField = new JTextField("TODO", 10);
+		prefixTextField.addKeyListener(new KeyListener() {
+			@Override
+			public void keyTyped(KeyEvent e) {
+				// no action
+			}
+
+			@Override
+			public void keyReleased(KeyEvent e) {
+				updateDiagramView();
+			}
+
+			@Override
+			public void keyPressed(KeyEvent e) {
+				// no action
+			}
+		});
 		prefixPanel.add(prefixLabel);
 		prefixPanel.add(prefixTextField);
 
@@ -168,6 +186,21 @@ ProjectEventListener
 		topPanel.add(scrollPane, BorderLayout.CENTER);
 
 		return topPanel;
+	}
+
+	private void showDiagram() {
+		int row = notesTable.getSelectedRow();
+		int col = notesTable.getSelectedColumn();
+
+		if(row < 0) {
+			return;
+		}
+
+		diagramViewManager.open(links.get(row).diagram);
+		if(col == 0) {
+			diagramViewManager.showInDiagramEditor(links.get(row).node);
+			diagramViewManager.unselectAll();
+		}
 	}
 
 	private void getNodes(String prefix) {
@@ -237,8 +270,8 @@ ProjectEventListener
 	 */
 	@Override
 	public void diagramSelectionChanged(IDiagramEditorSelectionEvent e) {
-		logger.log(Level.INFO, "diagramSelectionChanged");
-		updateDiagramView();
+		//logger.log(Level.INFO, "diagramSelectionChanged");
+		//updateDiagramView();
 	}
 
 	/**
@@ -246,8 +279,8 @@ ProjectEventListener
 	 */
 	@Override
 	public void entitySelectionChanged(IEntitySelectionEvent e) {
-		logger.log(Level.INFO, "entitySelectionChanged");
-		updateDiagramView();
+		//logger.log(Level.INFO, "entitySelectionChanged");
+		//updateDiagramView();
 	}
 
 	// ProjectEventListener
