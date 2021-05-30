@@ -3,6 +3,7 @@ package snytng.astah.plugin.linkplus;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Container;
+import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -16,6 +17,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -27,7 +29,6 @@ import javax.swing.table.DefaultTableModel;
 
 import com.change_vision.jude.api.inf.AstahAPI;
 import com.change_vision.jude.api.inf.model.IDiagram;
-import com.change_vision.jude.api.inf.model.IMindMapDiagram;
 import com.change_vision.jude.api.inf.model.INamedElement;
 import com.change_vision.jude.api.inf.model.IPackage;
 import com.change_vision.jude.api.inf.presentation.INodePresentation;
@@ -52,6 +53,12 @@ IEntitySelectionListener,
 IDiagramEditorSelectionListener,
 ProjectEventListener
 {
+	private static final String SEARCH_TYPE_ALL = "全て";
+
+	private static final String SEARCH_OPTION_CONTAINS = "含む";
+
+	private static final String SEARCH_OPTION_STARTSWITH = "前方一致";
+
 	/**
 	 * logger
 	 */
@@ -110,6 +117,8 @@ ProjectEventListener
 	JTable notesTable = null;
 	JScrollPane scrollPane = null;
 	JTextField prefixTextField = null;
+	JComboBox<String> searchOptions = null;
+	JComboBox<String> searchTypes = null;
 
 	class Link {
 		INodePresentation node;
@@ -155,7 +164,7 @@ ProjectEventListener
 				ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
 		JPanel menuPanel = new JPanel();
-		menuPanel.setLayout(new BorderLayout());
+		menuPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
 
 		JPanel prefixPanel = new JPanel();
 		JLabel prefixLabel = new JLabel("キーワード");
@@ -179,7 +188,15 @@ ProjectEventListener
 		prefixPanel.add(prefixLabel);
 		prefixPanel.add(prefixTextField);
 
-		menuPanel.add(prefixPanel, BorderLayout.WEST);
+		searchOptions = new JComboBox<>(new String[] {SEARCH_OPTION_STARTSWITH, SEARCH_OPTION_CONTAINS});
+		searchOptions.addActionListener(e -> updateDiagramView());
+
+		searchTypes = new JComboBox<>(new String[] {"Note", "Topic", "Class", SEARCH_TYPE_ALL});
+		searchTypes.addActionListener(e -> updateDiagramView());
+
+		menuPanel.add(prefixPanel);
+		menuPanel.add(searchOptions);
+		menuPanel.add(searchTypes);
 
 		JPanel topPanel = new JPanel();
 		topPanel.setLayout(new BorderLayout());
@@ -200,7 +217,6 @@ ProjectEventListener
 		diagramViewManager.open(links.get(row).diagram);
 		if(col == 0) {
 			diagramViewManager.showInDiagramEditor(links.get(row).node);
-			//diagramViewManager.unselectAll();
 		}
 	}
 
@@ -217,30 +233,30 @@ ProjectEventListener
 			.collect(Collectors.toList());
 
 			for(IDiagram d : ds) {
-				// ノートを追加
 				Stream.of(d.getPresentations())
 				.filter(INodePresentation.class::isInstance)
 				.map(INodePresentation.class::cast)
-				.filter(np -> np.getType().equals("Note"))
-				.filter(np -> np.getLabel().toLowerCase().startsWith(prefix.toLowerCase()))
+				.filter(np -> searchTypes.getSelectedItem().equals(SEARCH_TYPE_ALL) || np.getType().equals(searchTypes.getSelectedItem()))
+				.filter(np -> filterLabel(np.getLabel(), prefix))
 				.forEach(np -> links.add(new Link(np, d)));
-
-				// マインドマップのノードを追加
-				if(d instanceof IMindMapDiagram) {
-					Stream.of(d.getPresentations())
-					.filter(INodePresentation.class::isInstance)
-					.map(INodePresentation.class::cast)
-					.filter(np -> np.getLabel().toLowerCase().startsWith(prefix.toLowerCase()))
-					.forEach(np -> links.add(new Link(np, d)));
-				}
 			}
-
-
 
 		}catch(Exception e) {
 			e.printStackTrace();
 		}
 
+	}
+
+	private boolean filterLabel(String label, String keyword) {
+		if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_STARTSWITH)) {
+			return label.toLowerCase().startsWith(keyword.toLowerCase());
+
+		} else if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_CONTAINS)){
+			return label.toLowerCase().contains(keyword.toLowerCase());
+
+		}else {
+			return false;
+		}
 	}
 
 	public void getPackages(IPackage iPackage, List<IPackage> iPackages) {
