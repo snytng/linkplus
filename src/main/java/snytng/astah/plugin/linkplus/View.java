@@ -3,30 +3,32 @@ package snytng.astah.plugin.linkplus;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Container;
-import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JSlider;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.table.DefaultTableModel;
 
 import com.change_vision.jude.api.inf.AstahAPI;
-import com.change_vision.jude.api.inf.exception.InvalidUsingException;
 import com.change_vision.jude.api.inf.model.IDiagram;
-import com.change_vision.jude.api.inf.presentation.IPresentation;
+import com.change_vision.jude.api.inf.model.INamedElement;
+import com.change_vision.jude.api.inf.model.IPackage;
+import com.change_vision.jude.api.inf.presentation.INodePresentation;
 import com.change_vision.jude.api.inf.project.ProjectAccessor;
 import com.change_vision.jude.api.inf.project.ProjectEvent;
 import com.change_vision.jude.api.inf.project.ProjectEventListener;
@@ -104,38 +106,29 @@ ProjectEventListener
 
 	JPanel scrollPanel = null;
 	JTable notesTable = null;
-	JScrollPane textPanelScroll = null;
+	JScrollPane scrollPane = null;
 	JTextField prefixTextField = null;
 
-	JSlider zoomSlider = null;
+	class Link {
+		INodePresentation node;
+		IDiagram diagram;
 
+		Link(INodePresentation node, IDiagram diagram){
+			this.node = node;
+			this.diagram = diagram;
+		}
+	}
+	private List<Link> links = new ArrayList<>();
 
-	private String[][] tabledata = {
-			{"日本", "3勝", "0敗", "1分"},
-			{"クロアチア", "3勝", "1敗", "0分"},
-			{"ブラジル", "1勝", "2敗", "1分"},
-			{"オーストラリア", "2勝", "2敗", "0分"}
-			};
-
-	private String[] columnNames = new String[]{"COUNTRY", "WIN", "LOST", "EVEN"};
+	private String[] columnNames = new String[]{"ノート", "属性", "ダイアグラム"};
 
 	private DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0);
 
 	public Container createPane() {
-		JPanel buttonsPanel = new JPanel();
-		buttonsPanel.setLayout(new BoxLayout(buttonsPanel, BoxLayout.Y_AXIS));
-
-		scrollPanel = new JPanel();
-		scrollPanel.setLayout(new BoxLayout(scrollPanel, BoxLayout.Y_AXIS));
-		textPanelScroll = new JScrollPane(
-				scrollPanel,
-				ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
-				ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-
 
 		notesTable = new JTable(tableModel);
-		notesTable.setAutoCreateRowSorter(true);
 		notesTable.setColumnSelectionAllowed(true);
+		notesTable.setAutoCreateRowSorter(true);
 		notesTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
 
 		notesTable.addMouseListener(new MouseAdapter() {
@@ -149,69 +142,69 @@ ProjectEventListener
 		    }
 		});
 
-		notesTable.addMouseWheelListener(e -> {
-			if(e.isControlDown()) {
-				int wr = e.getWheelRotation();
-				Font f = notesTable.getFont();
-				int fs = f.getSize();
-				if(wr > 0) {
-					fs = Math.min(fs + wr, 100);
-				} else if(wr < 0) {
-					fs = Math.max(fs + wr, 10);
-				}
-				notesTable.setFont(new Font(f.getName(), f.getStyle(), fs));
-			}
-		});
-
-		scrollPanel.add(notesTable);
+		scrollPane = new JScrollPane(
+				notesTable,
+				ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
+				ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
 		JPanel menuPanel = new JPanel();
 		menuPanel.setLayout(new BorderLayout());
 
 		JPanel prefixPanel = new JPanel();
 		JLabel prefixLabel = new JLabel("接頭語");
-		prefixTextField = new JTextField(10);
+		prefixTextField = new JTextField("TODO", 10);
 		prefixPanel.add(prefixLabel);
 		prefixPanel.add(prefixTextField);
 
-		zoomSlider = new JSlider(10, 100, 12);
-		zoomSlider.setMajorTickSpacing(10);
-		zoomSlider.setPaintTicks(true);
-		zoomSlider.setSnapToTicks(true);
-		zoomSlider.addChangeListener(e -> {
-			int fs = zoomSlider.getValue();
-			Font f = notesTable.getFont();
-			notesTable.setFont(new Font(f.getName(), f.getStyle(), fs));
-		});
-
 		menuPanel.add(prefixPanel, BorderLayout.WEST);
-		menuPanel.add(zoomSlider, BorderLayout.EAST);
 
 		JPanel topPanel = new JPanel();
 		topPanel.setLayout(new BorderLayout());
 		topPanel.add(menuPanel, BorderLayout.NORTH);
-		topPanel.add(buttonsPanel, BorderLayout.EAST);
-		topPanel.add(textPanelScroll, BorderLayout.CENTER);
+		topPanel.add(scrollPane, BorderLayout.CENTER);
 
 		return topPanel;
 	}
 
-	public IPresentation[] getPresentations() {
-		IPresentation[] ps = diagramViewManager.getSelectedPresentations();
-		if(ps.length == 0) {
-			IDiagram d = diagramViewManager.getCurrentDiagram();
-			if(d == null) {
-				return new IPresentation[0];
-			} else {
-				try {
-					return d.getPresentations();
-				} catch (InvalidUsingException e) {
-					return new IPresentation[0];
-				}
+	private void getNodes(String prefix) {
+		links = new ArrayList<>();
+		try {
+			IPackage root = projectAccessor.getProject();
+			List<IPackage> ps = new ArrayList<>();
+			ps.add(root);
+			getPackages(root, ps);
+
+			List<IDiagram> ds = ps.stream()
+			.flatMap(p -> Stream.of(p.getDiagrams()))
+			//.peek(d -> System.out.println("digram=" + d.getName()))
+			.collect(Collectors.toList());
+
+			for(IDiagram d : ds) {
+				Stream.of(d.getPresentations())
+				.filter(INodePresentation.class::isInstance)
+				.map(INodePresentation.class::cast)
+				.filter(np -> np.getType().equals("Note"))
+				//.peek(np -> System.out.println("np=" + np.getLabel()))
+				.filter(np -> np.getLabel().toLowerCase().startsWith(prefix.toLowerCase()))
+				.forEach(np -> {
+					links.add(new Link(np, d));
+				});
 			}
-		} else {
-			return ps;
+
+		}catch(Exception e) {
+			e.printStackTrace();
 		}
+
+	}
+
+	public void getPackages(IPackage iPackage, List<IPackage> iPackages) {
+	     INamedElement[] iNamedElements = iPackage.getOwnedElements();
+	     for (INamedElement iNamedElement : iNamedElements) {
+	        if (iNamedElement instanceof IPackage) {
+	            iPackages.add((IPackage)iNamedElement);
+	            getPackages((IPackage)iNamedElement, iPackages);
+	        }
+	      }
 	}
 
 	/**
@@ -221,11 +214,17 @@ ProjectEventListener
 		try {
 			logger.log(Level.INFO, "update diagram view.");
 
+			getNodes(prefixTextField.getText());
+
 			tableModel.setRowCount(0);
 
-			for(String[] td : tabledata) {
-				tableModel.addRow(td);
-			}
+			System.out.println("links.size=" + links.size());
+			links.stream()
+			.map(l -> new String[] {l.node.getLabel(), l.node.getType(), l.diagram.getName()})
+			//.peek(s -> System.out.println(String.format("row={},{},{}", s[0], s[1], s[2])))
+			.forEach(tableModel::addRow);
+
+			tableModel.fireTableDataChanged();
 
 		}catch(Exception e){
 			logger.log(Level.WARNING, e.getMessage(), e);
@@ -281,6 +280,7 @@ ProjectEventListener
 	public void activated() {
 		// リスナーへの登録
 		addDiagramListeners();
+		updateDiagramView();
 	}
 
 	@Override
