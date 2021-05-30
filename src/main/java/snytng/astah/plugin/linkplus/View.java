@@ -137,8 +137,12 @@ ProjectEventListener
 				// 選択行の行番号を取得します
 				int row = notesTable.getSelectedRow();
 				int col = notesTable.getSelectedColumn();
-
 				System.out.println("行" + row + "::" + "列" + col);
+
+				diagramViewManager.open(links.get(row).diagram);
+				if(col == 0) {
+					diagramViewManager.showInDiagramEditor(links.get(row).node);
+				}
 		    }
 		});
 
@@ -151,7 +155,7 @@ ProjectEventListener
 		menuPanel.setLayout(new BorderLayout());
 
 		JPanel prefixPanel = new JPanel();
-		JLabel prefixLabel = new JLabel("接頭語");
+		JLabel prefixLabel = new JLabel("文字列");
 		prefixTextField = new JTextField("TODO", 10);
 		prefixPanel.add(prefixLabel);
 		prefixPanel.add(prefixTextField);
@@ -176,7 +180,6 @@ ProjectEventListener
 
 			List<IDiagram> ds = ps.stream()
 			.flatMap(p -> Stream.of(p.getDiagrams()))
-			//.peek(d -> System.out.println("digram=" + d.getName()))
 			.collect(Collectors.toList());
 
 			for(IDiagram d : ds) {
@@ -184,7 +187,6 @@ ProjectEventListener
 				.filter(INodePresentation.class::isInstance)
 				.map(INodePresentation.class::cast)
 				.filter(np -> np.getType().equals("Note"))
-				//.peek(np -> System.out.println("np=" + np.getLabel()))
 				.filter(np -> np.getLabel().toLowerCase().startsWith(prefix.toLowerCase()))
 				.forEach(np -> {
 					links.add(new Link(np, d));
@@ -221,7 +223,6 @@ ProjectEventListener
 			System.out.println("links.size=" + links.size());
 			links.stream()
 			.map(l -> new String[] {l.node.getLabel(), l.node.getType(), l.diagram.getName()})
-			//.peek(s -> System.out.println(String.format("row={},{},{}", s[0], s[1], s[2])))
 			.forEach(tableModel::addRow);
 
 			tableModel.fireTableDataChanged();
@@ -280,6 +281,7 @@ ProjectEventListener
 	public void activated() {
 		// リスナーへの登録
 		addDiagramListeners();
+
 		updateDiagramView();
 	}
 
