@@ -133,7 +133,7 @@ ProjectEventListener
 
 	private transient List<Link> links = new ArrayList<>();
 
-	private String[] columnNames = new String[]{"ノート", "属性", "ダイアグラム", "パス"};
+	private String[] columnNames = new String[]{"ノード", "属性", "ダイアグラム", "パス"};
 
 	@SuppressWarnings("serial")
 	private DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
@@ -253,7 +253,7 @@ ProjectEventListener
 		if(label == null || keyword == null){
 			return false;
 		}
-		
+
 		if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_STARTSWITH)) {
 			return label.toLowerCase().startsWith(keyword.toLowerCase());
 
@@ -274,7 +274,7 @@ ProjectEventListener
 	        }
 	      }
 	}
-	
+
     private String getPackageName(IDiagram diagram) {
         StringBuffer sb = new StringBuffer();
         IElement owner = diagram.getOwner();
