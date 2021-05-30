@@ -29,6 +29,7 @@ import javax.swing.table.DefaultTableModel;
 
 import com.change_vision.jude.api.inf.AstahAPI;
 import com.change_vision.jude.api.inf.model.IDiagram;
+import com.change_vision.jude.api.inf.model.IElement;
 import com.change_vision.jude.api.inf.model.INamedElement;
 import com.change_vision.jude.api.inf.model.IPackage;
 import com.change_vision.jude.api.inf.presentation.INodePresentation;
@@ -132,8 +133,9 @@ ProjectEventListener
 
 	private transient List<Link> links = new ArrayList<>();
 
-	private String[] columnNames = new String[]{"ノート", "属性", "ダイアグラム"};
+	private String[] columnNames = new String[]{"ノート", "属性", "ダイアグラム", "パス"};
 
+	@SuppressWarnings("serial")
 	private DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
 		// セル編集できないようにする
 		@Override public boolean isCellEditable(int row, int column) {
@@ -268,6 +270,16 @@ ProjectEventListener
 	        }
 	      }
 	}
+	
+    private String getPackageName(IDiagram diagram) {
+        StringBuffer sb = new StringBuffer();
+        IElement owner = diagram.getOwner();
+        while (owner != null && owner instanceof INamedElement && owner.getOwner() != null) {
+            sb.insert(0, ((INamedElement) owner).getName() + "::");
+            owner = owner.getOwner();
+        }
+        return sb.toString();
+    }
 
 	/**
 	 * 表示を更新する
@@ -282,7 +294,13 @@ ProjectEventListener
 
 			logger.log(Level.INFO, () -> "links.size=" + links.size());
 			links.stream()
-			.map(l -> new String[] {l.node.getLabel(), l.node.getType(), l.diagram.getName()})
+			.map(l -> {
+				String label = l.node.getLabel();
+				String type = l.node.getType();
+				String name = l.diagram.getName();
+				String path = getPackageName(l.diagram);
+				return new String[] {label, type, name, path};
+			})
 			.forEach(tableModel::addRow);
 
 			tableModel.fireTableDataChanged();
