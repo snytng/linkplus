@@ -3,10 +3,13 @@ package snytng.astah.plugin.linkplus;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Container;
+import java.awt.EventQueue;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -24,15 +27,24 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.RowSorter;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.TableColumnModelEvent;
+import javax.swing.event.TableColumnModelListener;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
+import javax.swing.table.TableColumnModel;
+import javax.swing.table.TableModel;
 
 import com.change_vision.jude.api.inf.AstahAPI;
+import com.change_vision.jude.api.inf.model.IClass;
 import com.change_vision.jude.api.inf.model.IDiagram;
 import com.change_vision.jude.api.inf.model.IElement;
 import com.change_vision.jude.api.inf.model.INamedElement;
 import com.change_vision.jude.api.inf.model.IPackage;
-import com.change_vision.jude.api.inf.presentation.INodePresentation;
+import com.change_vision.jude.api.inf.presentation.IPresentation;
 import com.change_vision.jude.api.inf.project.ProjectAccessor;
 import com.change_vision.jude.api.inf.project.ProjectEvent;
 import com.change_vision.jude.api.inf.project.ProjectEventListener;
@@ -54,11 +66,13 @@ IEntitySelectionListener,
 IDiagramEditorSelectionListener,
 ProjectEventListener
 {
-	private static final String SEARCH_TYPE_ALL = "全て";
-
-	private static final String SEARCH_OPTION_CONTAINS = "含む";
+	private static final String SEARCH_TYPE_NOTE  = "Note";
+	private static final String SEARCH_TYPE_TOPIC = "Topic";
+	private static final String SEARCH_TYPE_CLASS = "Class";
+	private static final String SEARCH_TYPE_ALL   = "全て";
 
 	private static final String SEARCH_OPTION_STARTSWITH = "前方一致";
+	private static final String SEARCH_OPTION_CONTAINS   = "含む";
 
 	/**
 	 * logger
@@ -66,7 +80,7 @@ ProjectEventListener
 	static final Logger logger = Logger.getLogger(View.class.getName());
 	static {
 		ConsoleHandler consoleHandler = new ConsoleHandler();
-		consoleHandler.setLevel(Level.INFO);
+		consoleHandler.setLevel(Level.WARNING);
 		logger.addHandler(consoleHandler);
 		logger.setUseParentHandlers(false);
 	}
@@ -117,18 +131,46 @@ ProjectEventListener
 	JPanel scrollPanel = null;
 	JTable notesTable = null;
 	JScrollPane scrollPane = null;
-	JTextField prefixTextField = null;
+	JTextField keywordTextField = null;
 	JComboBox<String> searchOptions = null;
 	JComboBox<String> searchTypes = null;
 
 	class Link {
-		INodePresentation node;
+		String label;
+		IPresentation presentation;
 		IDiagram diagram;
 
-		Link(INodePresentation node, IDiagram diagram){
-			this.node = node;
+		Link(IPresentation presentation, IDiagram diagram){
+			this.label = presentation.getLabel();
+			this.presentation = presentation;
 			this.diagram = diagram;
 		}
+
+		Link(String label, IPresentation presentation, IDiagram diagram){
+			this.label = label;
+			this.presentation = presentation;
+			this.diagram = diagram;
+		}
+
+		public String getLabel() {
+			return label;
+		}
+
+		public String getPackageName() {
+	        StringBuilder sb = new StringBuilder();
+	        IElement owner = diagram.getOwner();
+	        while (owner instanceof INamedElement && owner.getOwner() != null) {
+	            sb.insert(0, ((INamedElement) owner).getName() + "::");
+	            owner = owner.getOwner();
+	        }
+	        return sb.toString();
+	    }
+
+		public String toString() {
+			return getLabel();
+		}
+
+
 	}
 
 	private transient List<Link> links = new ArrayList<>();
@@ -146,18 +188,69 @@ ProjectEventListener
 	public Container createPane() {
 
 		notesTable = new JTable(tableModel);
-		notesTable.setColumnSelectionAllowed(true);
-		notesTable.setAutoCreateRowSorter(true);
+		notesTable.setRowSelectionAllowed(true);    // 行選択を可能にする
+		notesTable.setColumnSelectionAllowed(true); // 列選択を可能にする
+		notesTable.setCellSelectionEnabled(true);   // セル選択を可能にする
+		notesTable.setAutoCreateRowSorter(true);    // ソートを可能にする
 		notesTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
 		notesTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-		ListSelectionModel selectionModel = notesTable.getSelectionModel();
-		selectionModel.addListSelectionListener(e -> {
-			if (e.getValueIsAdjusting()) {
-				return;
-			}
+		notesTable.getSelectionModel().addListSelectionListener(e -> {
+			logger.log(Level.INFO, "ListSelectionListener");
 			showDiagram();
 			notesTable.requestFocusInWindow();
+		});
+		notesTable.getColumnModel().addColumnModelListener(new TableColumnModelListener() {
+			@Override
+			public void columnSelectionChanged(ListSelectionEvent e) {
+				logger.log(Level.INFO, "TableColumnModelListener columnSelectionChanged");
+				showDiagram();
+				notesTable.requestFocusInWindow();
+			}
+
+			@Override
+			public void columnRemoved(TableColumnModelEvent e) {
+				// no action
+			}
+
+			@Override
+			public void columnMoved(TableColumnModelEvent e) {
+				// no action
+			}
+
+			@Override
+			public void columnMarginChanged(ChangeEvent e) {
+				// no action
+			}
+
+			@Override
+			public void columnAdded(TableColumnModelEvent e) {
+				// no action
+			}
+		});
+
+		// ヘッダーをShiftキーを押しながらクリックするとソート状態を解除する
+		notesTable.getTableHeader().addMouseListener(new MouseAdapter() {
+			@Override public void mouseClicked(MouseEvent e) {
+				final RowSorter<? extends TableModel> sorter = notesTable.getRowSorter();
+				if (sorter == null || sorter.getSortKeys().isEmpty()) {
+					return;
+				}
+				JTableHeader h = (JTableHeader) e.getComponent();
+				TableColumnModel columnModel = h.getColumnModel();
+				int viewColumn = columnModel.getColumnIndexAtX(e.getX());
+				if (viewColumn < 0) {
+					return;
+				}
+				int column = columnModel.getColumn(viewColumn).getModelIndex();
+				if (column != -1 && e.isShiftDown()) {
+					EventQueue.invokeLater(new Runnable() {
+						@Override public void run() {
+							sorter.setSortKeys(null);
+						}
+					});
+				}
+			}
 		});
 
 		scrollPane = new JScrollPane(
@@ -168,10 +261,10 @@ ProjectEventListener
 		JPanel menuPanel = new JPanel();
 		menuPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
 
-		JPanel prefixPanel = new JPanel();
-		JLabel prefixLabel = new JLabel("キーワード");
-		prefixTextField = new JTextField("TODO", 10);
-		prefixTextField.addKeyListener(new KeyListener() {
+		JPanel keywordPanel = new JPanel();
+		JLabel keywordLabel = new JLabel("キーワード");
+		keywordTextField = new JTextField("TODO", 10);
+		keywordTextField.addKeyListener(new KeyListener() {
 			@Override
 			public void keyTyped(KeyEvent e) {
 				// no action
@@ -187,16 +280,24 @@ ProjectEventListener
 				// no action
 			}
 		});
-		prefixPanel.add(prefixLabel);
-		prefixPanel.add(prefixTextField);
+		keywordPanel.add(keywordLabel);
+		keywordPanel.add(keywordTextField);
 
-		searchOptions = new JComboBox<>(new String[] {SEARCH_OPTION_STARTSWITH, SEARCH_OPTION_CONTAINS});
+		searchOptions = new JComboBox<>(new String[] {
+				SEARCH_OPTION_STARTSWITH,
+				SEARCH_OPTION_CONTAINS
+				});
 		searchOptions.addActionListener(e -> updateDiagramView());
 
-		searchTypes = new JComboBox<>(new String[] {"Note", "Topic", "Class", SEARCH_TYPE_ALL});
+		searchTypes = new JComboBox<>(new String[] {
+				SEARCH_TYPE_NOTE,
+				SEARCH_TYPE_TOPIC,
+				SEARCH_TYPE_CLASS,
+				SEARCH_TYPE_ALL
+				});
 		searchTypes.addActionListener(e -> updateDiagramView());
 
-		menuPanel.add(prefixPanel);
+		menuPanel.add(keywordPanel);
 		menuPanel.add(searchOptions);
 		menuPanel.add(searchTypes);
 
@@ -212,17 +313,24 @@ ProjectEventListener
 		int row = notesTable.getSelectedRow();
 		int col = notesTable.getSelectedColumn();
 
+		logger.log(Level.INFO, "notesTable select (" + row + "," + col + ")");
+
+		// 未選択状態
 		if(row < 0) {
 			return;
 		}
 
-		diagramViewManager.open(links.get(row).diagram);
+		Link link = (Link)notesTable.getValueAt(row, 0);
+		diagramViewManager.open(link.diagram);
 		if(col == 0) {
-			diagramViewManager.showInDiagramEditor(links.get(row).node);
+			diagramViewManager.select(link.presentation);
+			diagramViewManager.showInDiagramEditor(link.presentation);
+		} else {
+			diagramViewManager.unselectAll();
 		}
 	}
 
-	private void getNodes(String prefix) {
+	private void getPresentationsWithLabel(String keyword) {
 		links = new ArrayList<>();
 		try {
 			IPackage root = projectAccessor.getProject();
@@ -234,13 +342,42 @@ ProjectEventListener
 			.flatMap(p -> Stream.of(p.getDiagrams()))
 			.collect(Collectors.toList());
 
+			// ダイアグラムを巡回
 			for(IDiagram d : ds) {
+
+				// Presentationを登録
 				Stream.of(d.getPresentations())
-				.filter(INodePresentation.class::isInstance)
-				.map(INodePresentation.class::cast)
-				.filter(np -> searchTypes.getSelectedItem().equals(SEARCH_TYPE_ALL) || np.getType().equals(searchTypes.getSelectedItem()))
-				.filter(np -> filterLabel(np.getLabel(), prefix))
-				.forEach(np -> links.add(new Link(np, d)));
+				.filter(p -> filterType(p.getType()))
+				.filter(p -> filterLabel(p.getLabel(), keyword))
+				.forEach(p -> links.add(new Link(p, d)));
+
+				// クラス要素とステレオタイプを登録
+				Stream.of(d.getPresentations())
+				.filter(p -> searchTypes.getSelectedItem().equals(SEARCH_TYPE_ALL))
+				.forEach(p -> {
+					// クラスの場合にはメソッドと属性を確認
+					if(p.getType().equals("Class")) {
+						IClass c = (IClass)p.getModel();
+						Stream.of(c.getOperations())
+						.filter(o -> filterLabel(o.getName(), keyword))
+						.forEach(o -> {
+							links.add(new Link(o.getName(), p, d));
+						});
+						Stream.of(c.getAttributes())
+						.filter(a -> filterLabel(a.getName(), keyword))
+						.forEach(a -> {
+							links.add(new Link(a.getName(), p, d));
+						});
+					}
+
+					// ステレオタイプを確認
+					if(p.getModel() != null) {
+						Stream.of(p.getModel().getStereotypes())
+						.filter(s -> filterLabel(s, keyword))
+						.forEach(s -> links.add(new Link(s, p, d)));
+					}
+
+				});
 			}
 
 		}catch(Exception e) {
@@ -249,9 +386,26 @@ ProjectEventListener
 
 	}
 
+	private boolean filterType(String type) {
+		if(type == null) {
+			return false;
+		}
+
+		return searchTypes.getSelectedItem().equals(SEARCH_TYPE_ALL) ||
+				type.equals(searchTypes.getSelectedItem());
+	}
+
 	private boolean filterLabel(String label, String keyword) {
 		if(label == null || keyword == null){
 			return false;
+		}
+
+		if(label.isEmpty()) {
+			return false;
+		}
+
+		if(keyword.isEmpty()) {
+			return true;
 		}
 
 		if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_STARTSWITH)) {
@@ -275,16 +429,6 @@ ProjectEventListener
 	      }
 	}
 
-    private String getPackageName(IDiagram diagram) {
-        StringBuffer sb = new StringBuffer();
-        IElement owner = diagram.getOwner();
-        while (owner != null && owner instanceof INamedElement && owner.getOwner() != null) {
-            sb.insert(0, ((INamedElement) owner).getName() + "::");
-            owner = owner.getOwner();
-        }
-        return sb.toString();
-    }
-
 	/**
 	 * 表示を更新する
 	 */
@@ -292,18 +436,17 @@ ProjectEventListener
 		try {
 			logger.log(Level.INFO, "update diagram view.");
 
-			getNodes(prefixTextField.getText());
+			getPresentationsWithLabel(keywordTextField.getText());
 
 			tableModel.setRowCount(0);
 
 			logger.log(Level.INFO, () -> "links.size=" + links.size());
 			links.stream()
 			.map(l -> {
-				String label = l.node.getLabel();
-				String type = l.node.getType();
-				String name = l.diagram.getName();
-				String path = getPackageName(l.diagram);
-				return new String[] {label, type, name, path};
+				String type  = l.presentation.getType();
+				String name  = l.diagram.getName();
+				String path  = l.getPackageName();
+				return new Object[] {l, type, name, path};
 			})
 			.forEach(tableModel::addRow);
 
