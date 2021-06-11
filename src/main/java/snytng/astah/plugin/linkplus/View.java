@@ -1,6 +1,7 @@
 package snytng.astah.plugin.linkplus;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.EventQueue;
@@ -66,14 +67,6 @@ IEntitySelectionListener,
 IDiagramEditorSelectionListener,
 ProjectEventListener
 {
-	private static final String SEARCH_TYPE_NOTE  = "Note";
-	private static final String SEARCH_TYPE_TOPIC = "Topic";
-	private static final String SEARCH_TYPE_CLASS = "Class";
-	private static final String SEARCH_TYPE_ALL   = "全て";
-
-	private static final String SEARCH_OPTION_STARTSWITH = "前方一致";
-	private static final String SEARCH_OPTION_CONTAINS   = "含む";
-
 	/**
 	 * logger
 	 */
@@ -129,7 +122,7 @@ ProjectEventListener
 	}
 
 	JPanel scrollPanel = null;
-	JTable notesTable = null;
+	JTable linksTable = null;
 	JScrollPane scrollPane = null;
 	JTextField keywordTextField = null;
 	JComboBox<String> searchOptions = null;
@@ -157,14 +150,14 @@ ProjectEventListener
 		}
 
 		public String getPackageName() {
-	        StringBuilder sb = new StringBuilder();
-	        IElement owner = diagram.getOwner();
-	        while (owner instanceof INamedElement && owner.getOwner() != null) {
-	            sb.insert(0, ((INamedElement) owner).getName() + "::");
-	            owner = owner.getOwner();
-	        }
-	        return sb.toString();
-	    }
+			StringBuilder sb = new StringBuilder();
+			IElement owner = diagram.getOwner();
+			while (owner instanceof INamedElement && owner.getOwner() != null) {
+				sb.insert(0, ((INamedElement) owner).getName() + "::");
+				owner = owner.getOwner();
+			}
+			return sb.toString();
+		}
 
 		public String toString() {
 			return getLabel();
@@ -185,27 +178,39 @@ ProjectEventListener
 		}
 	};
 
+	private static final String SEARCH_TYPE_NOTE  = "Note";
+	private static final String SEARCH_TYPE_TOPIC = "Topic";
+	private static final String SEARCH_TYPE_CLASS = "Class";
+	private static final String SEARCH_TYPE_ALL   = "全て";
+
+	private static final String SEARCH_OPTION_STARTSWITH = "前方一致";
+	private static final String SEARCH_OPTION_CONTAINS   = "含む";
+	private static final String SEARCH_OPTION_COLOR   = "色一致";
+
+	private static final String FONT_COLOR = "font.color";
+
+
 	public Container createPane() {
 
-		notesTable = new JTable(tableModel);
-		notesTable.setRowSelectionAllowed(true);    // 行選択を可能にする
-		notesTable.setColumnSelectionAllowed(true); // 列選択を可能にする
-		notesTable.setCellSelectionEnabled(true);   // セル選択を可能にする
-		notesTable.setAutoCreateRowSorter(true);    // ソートを可能にする
-		notesTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
-		notesTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		linksTable = new JTable(tableModel);
+		linksTable.setRowSelectionAllowed(true);    // 行選択を可能にする
+		linksTable.setColumnSelectionAllowed(true); // 列選択を可能にする
+		linksTable.setCellSelectionEnabled(true);   // セル選択を可能にする
+		linksTable.setAutoCreateRowSorter(true);    // ソートを可能にする
+		linksTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+		linksTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-		notesTable.getSelectionModel().addListSelectionListener(e -> {
+		linksTable.getSelectionModel().addListSelectionListener(e -> {
 			logger.log(Level.INFO, "ListSelectionListener");
 			showDiagram();
-			notesTable.requestFocusInWindow();
+			linksTable.requestFocusInWindow();
 		});
-		notesTable.getColumnModel().addColumnModelListener(new TableColumnModelListener() {
+		linksTable.getColumnModel().addColumnModelListener(new TableColumnModelListener() {
 			@Override
 			public void columnSelectionChanged(ListSelectionEvent e) {
 				logger.log(Level.INFO, "TableColumnModelListener columnSelectionChanged");
 				showDiagram();
-				notesTable.requestFocusInWindow();
+				linksTable.requestFocusInWindow();
 			}
 
 			@Override
@@ -230,9 +235,9 @@ ProjectEventListener
 		});
 
 		// ヘッダーをShiftキーを押しながらクリックするとソート状態を解除する
-		notesTable.getTableHeader().addMouseListener(new MouseAdapter() {
+		linksTable.getTableHeader().addMouseListener(new MouseAdapter() {
 			@Override public void mouseClicked(MouseEvent e) {
-				final RowSorter<? extends TableModel> sorter = notesTable.getRowSorter();
+				final RowSorter<? extends TableModel> sorter = linksTable.getRowSorter();
 				if (sorter == null || sorter.getSortKeys().isEmpty()) {
 					return;
 				}
@@ -254,7 +259,7 @@ ProjectEventListener
 		});
 
 		scrollPane = new JScrollPane(
-				notesTable,
+				linksTable,
 				ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
 				ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
@@ -285,16 +290,24 @@ ProjectEventListener
 
 		searchOptions = new JComboBox<>(new String[] {
 				SEARCH_OPTION_STARTSWITH,
-				SEARCH_OPTION_CONTAINS
-				});
-		searchOptions.addActionListener(e -> updateDiagramView());
+				SEARCH_OPTION_CONTAINS,
+				SEARCH_OPTION_COLOR
+		});
+		searchOptions.addActionListener(e -> {
+			if(! searchOptions.getSelectedItem().equals(SEARCH_OPTION_COLOR)){
+				keywordTextField.setBackground(Color.WHITE);
+				selectedFontColor = FONT_COLOR_BLACK;
+			}
+
+			updateDiagramView();
+			});
 
 		searchTypes = new JComboBox<>(new String[] {
 				SEARCH_TYPE_NOTE,
 				SEARCH_TYPE_TOPIC,
 				SEARCH_TYPE_CLASS,
 				SEARCH_TYPE_ALL
-				});
+		});
 		searchTypes.addActionListener(e -> updateDiagramView());
 
 		menuPanel.add(keywordPanel);
@@ -310,8 +323,8 @@ ProjectEventListener
 	}
 
 	private void showDiagram() {
-		int row = notesTable.getSelectedRow();
-		int col = notesTable.getSelectedColumn();
+		int row = linksTable.getSelectedRow();
+		int col = linksTable.getSelectedColumn();
 
 		logger.log(Level.INFO, "notesTable select (" + row + "," + col + ")");
 
@@ -320,7 +333,7 @@ ProjectEventListener
 			return;
 		}
 
-		Link link = (Link)notesTable.getValueAt(row, 0);
+		Link link = (Link)linksTable.getValueAt(row, 0);
 		diagramViewManager.open(link.diagram);
 		if(col == 0) {
 			diagramViewManager.select(link.presentation);
@@ -339,8 +352,8 @@ ProjectEventListener
 			getPackages(root, ps);
 
 			List<IDiagram> ds = ps.stream()
-			.flatMap(p -> Stream.of(p.getDiagrams()))
-			.collect(Collectors.toList());
+					.flatMap(p -> Stream.of(p.getDiagrams()))
+					.collect(Collectors.toList());
 
 			// ダイアグラムを巡回
 			for(IDiagram d : ds) {
@@ -349,20 +362,26 @@ ProjectEventListener
 				Stream.of(d.getPresentations())
 				.filter(p -> filterType(p.getType()))
 				.filter(p -> filterLabel(p.getLabel(), keyword))
+				.filter(p -> filterFontColor(p, keywordTextField.getBackground()))
 				.forEach(p -> links.add(new Link(p, d)));
 
-				// クラス要素とステレオタイプを登録
+				// 全て洗濯した場合には、クラス要素とステレオタイプを登録
 				Stream.of(d.getPresentations())
 				.filter(p -> searchTypes.getSelectedItem().equals(SEARCH_TYPE_ALL))
+				.filter(p -> ! searchOptions.getSelectedItem().equals(SEARCH_OPTION_COLOR)) // 色選択は除外
 				.forEach(p -> {
 					// クラスの場合にはメソッドと属性を確認
 					if(p.getType().equals("Class")) {
 						IClass c = (IClass)p.getModel();
+
+						// メソッド
 						Stream.of(c.getOperations())
 						.filter(o -> filterLabel(o.getName(), keyword))
 						.forEach(o -> {
 							links.add(new Link(o.getName(), p, d));
 						});
+
+						// 属性
 						Stream.of(c.getAttributes())
 						.filter(a -> filterLabel(a.getName(), keyword))
 						.forEach(a -> {
@@ -414,19 +433,35 @@ ProjectEventListener
 		} else if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_CONTAINS)){
 			return label.toLowerCase().contains(keyword.toLowerCase());
 
+		} else if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_COLOR)){
+			return true;
+
 		}else {
 			return false;
 		}
 	}
 
+	private static final String FONT_COLOR_BLACK = "#000000";
+	private String selectedFontColor = FONT_COLOR_BLACK;
+
+	private boolean filterFontColor(IPresentation p, Color filterColor) {
+		if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_COLOR)) {
+			String fontColor = p.getProperty(FONT_COLOR);
+			return selectedFontColor.equals(fontColor);
+
+		} else {
+			return true;
+		}
+	}
+
 	public void getPackages(IPackage iPackage, List<IPackage> iPackages) {
-	     INamedElement[] iNamedElements = iPackage.getOwnedElements();
-	     for (INamedElement iNamedElement : iNamedElements) {
-	        if (iNamedElement instanceof IPackage) {
-	            iPackages.add((IPackage)iNamedElement);
-	            getPackages((IPackage)iNamedElement, iPackages);
-	        }
-	      }
+		INamedElement[] iNamedElements = iPackage.getOwnedElements();
+		for (INamedElement iNamedElement : iNamedElements) {
+			if (iNamedElement instanceof IPackage) {
+				iPackages.add((IPackage)iNamedElement);
+				getPackages((IPackage)iNamedElement, iPackages);
+			}
+		}
 	}
 
 	/**
@@ -471,6 +506,34 @@ ProjectEventListener
 	@Override
 	public void entitySelectionChanged(IEntitySelectionEvent e) {
 		logger.log(Level.INFO, "entitySelectionChanged");
+
+		if(! searchOptions.getSelectedItem().equals(SEARCH_OPTION_COLOR)) {
+			return;
+		}
+
+		IPresentation[] ps = diagramViewManager.getSelectedPresentations();
+		if (ps.length == 0) {
+			keywordTextField.setBackground(Color.WHITE);
+			selectedFontColor = FONT_COLOR_BLACK;
+			return;
+		}
+
+		IPresentation p = ps[0];
+
+		String fontColor = p.getProperty(FONT_COLOR);
+		if(fontColor.equals("null")) {
+			return;
+		}
+		this.selectedFontColor = fontColor;
+
+		int r = Integer.decode("0x" + fontColor.substring(1,3));
+		int g = Integer.decode("0x" + fontColor.substring(3,5));
+		int b = Integer.decode("0x" + fontColor.substring(5,7));
+
+		keywordTextField.setBackground(new Color(r,g,b));
+		keywordTextField.setText("");
+
+		updateDiagramView();
 	}
 
 	// ProjectEventListener
