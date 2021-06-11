@@ -21,6 +21,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -127,6 +128,8 @@ ProjectEventListener
 	JTextField keywordTextField = null;
 	JComboBox<String> searchOptions = null;
 	JComboBox<String> searchTypes = null;
+	JButton fontColorButton = null;
+	JComboBox<String> searchColors = null;
 
 	class Link {
 		String label;
@@ -185,10 +188,14 @@ ProjectEventListener
 
 	private static final String SEARCH_OPTION_STARTSWITH = "前方一致";
 	private static final String SEARCH_OPTION_CONTAINS   = "含む";
-	private static final String SEARCH_OPTION_COLOR   = "色一致";
 
-	private static final String FONT_COLOR = "font.color";
+	private static final String SEARCH_FONT_COLOR_ALL       = "全て";
+	private static final String SEARCH_FONT_COLOR_MATCH     = "同じ";
+	private static final String SEARCH_FONT_COLOR_NOT_MATCH = "違う";
 
+	private static final String PROPERTY_FONT_COLOR = "font.color";
+	private static final String FONT_COLOR_BLACK = "#000000";
+	private String selectedFontColor = FONT_COLOR_BLACK;
 
 	public Container createPane() {
 
@@ -291,17 +298,10 @@ ProjectEventListener
 		searchOptions = new JComboBox<>(new String[] {
 				SEARCH_OPTION_STARTSWITH,
 				SEARCH_OPTION_CONTAINS,
-				SEARCH_OPTION_COLOR
 		});
-		searchOptions.addActionListener(e -> {
-			if(! searchOptions.getSelectedItem().equals(SEARCH_OPTION_COLOR)){
-				keywordTextField.setBackground(Color.WHITE);
-				selectedFontColor = FONT_COLOR_BLACK;
-			}
+		searchOptions.addActionListener(e -> updateDiagramView());
 
-			updateDiagramView();
-			});
-
+		JLabel searchTypesLabel = new JLabel("要素");
 		searchTypes = new JComboBox<>(new String[] {
 				SEARCH_TYPE_NOTE,
 				SEARCH_TYPE_TOPIC,
@@ -310,9 +310,47 @@ ProjectEventListener
 		});
 		searchTypes.addActionListener(e -> updateDiagramView());
 
+		fontColorButton = new JButton("文字色");
+		fontColorButton.setForeground(Color.BLACK);
+		fontColorButton.addActionListener(e -> {
+			IPresentation[] ps = diagramViewManager.getSelectedPresentations();
+			if (ps.length == 0) {
+				return;
+			}
+
+			IPresentation p = ps[0];
+
+			String fontColor = p.getProperty(PROPERTY_FONT_COLOR);
+			if(fontColor.equals("null")) {
+				return;
+			}
+			this.selectedFontColor = fontColor;
+
+			int r = Integer.decode("0x" + fontColor.substring(1,3));
+			int g = Integer.decode("0x" + fontColor.substring(3,5));
+			int b = Integer.decode("0x" + fontColor.substring(5,7));
+
+			fontColorButton.setForeground(new Color(r,g,b));
+
+			updateDiagramView();
+		});
+
+		fontColorButton.setMnemonic(KeyEvent.VK_C);
+
+		searchColors = new JComboBox<>(new String[] {
+				SEARCH_FONT_COLOR_ALL,
+				SEARCH_FONT_COLOR_MATCH,
+				SEARCH_FONT_COLOR_NOT_MATCH
+		});
+		searchColors.addActionListener(e -> updateDiagramView());
+
+
 		menuPanel.add(keywordPanel);
 		menuPanel.add(searchOptions);
+		menuPanel.add(searchTypesLabel);
 		menuPanel.add(searchTypes);
+		menuPanel.add(fontColorButton);
+		menuPanel.add(searchColors);
 
 		JPanel topPanel = new JPanel();
 		topPanel.setLayout(new BorderLayout());
@@ -326,7 +364,7 @@ ProjectEventListener
 		int row = linksTable.getSelectedRow();
 		int col = linksTable.getSelectedColumn();
 
-		logger.log(Level.INFO, "notesTable select (" + row + "," + col + ")");
+		logger.log(Level.INFO, () -> "notesTable select (" + row + "," + col + ")");
 
 		// 未選択状態
 		if(row < 0) {
@@ -358,45 +396,54 @@ ProjectEventListener
 			// ダイアグラムを巡回
 			for(IDiagram d : ds) {
 
-				// Presentationを登録
-				Stream.of(d.getPresentations())
-				.filter(p -> filterType(p.getType()))
-				.filter(p -> filterLabel(p.getLabel(), keyword))
-				.filter(p -> filterFontColor(p, keywordTextField.getBackground()))
-				.forEach(p -> links.add(new Link(p, d)));
+				// 色選択の場合
+				if (! searchColors.getSelectedItem().equals(SEARCH_FONT_COLOR_ALL)) {
+					// Presentationを登録
+					Stream.of(d.getPresentations())
+					.filter(p -> filterType(p.getType()))
+					.filter(p -> filterLabel(p.getLabel(), keyword))
+					.filter(this::filterFontColor)
+					.forEach(p -> links.add(new Link(p, d)));
+				}
+				// 色選択でない場合
+				else {
+					// Presentationを登録
+					Stream.of(d.getPresentations())
+					.filter(p -> filterType(p.getType()))
+					.filter(p -> filterLabel(p.getLabel(), keyword))
+					.forEach(p -> links.add(new Link(p, d)));
 
-				// 全て洗濯した場合には、クラス要素とステレオタイプを登録
-				Stream.of(d.getPresentations())
-				.filter(p -> searchTypes.getSelectedItem().equals(SEARCH_TYPE_ALL))
-				.filter(p -> ! searchOptions.getSelectedItem().equals(SEARCH_OPTION_COLOR)) // 色選択は除外
-				.forEach(p -> {
-					// クラスの場合にはメソッドと属性を確認
-					if(p.getType().equals("Class")) {
-						IClass c = (IClass)p.getModel();
+					// 全てを選択した場合には、クラス要素とステレオタイプを登録
+					Stream.of(d.getPresentations())
+					.filter(p -> searchTypes.getSelectedItem().equals(SEARCH_TYPE_ALL))
+					.forEach(p -> {
+						// クラスの場合にはメソッドと属性を確認
+						if(p.getType().equals("Class")) {
+							IClass c = (IClass)p.getModel();
 
-						// メソッド
-						Stream.of(c.getOperations())
-						.filter(o -> filterLabel(o.getName(), keyword))
-						.forEach(o -> {
-							links.add(new Link(o.getName(), p, d));
-						});
+							// メソッド
+							Stream.of(c.getOperations())
+							.filter(o -> filterLabel(o.getName(), keyword))
+							.forEach(o -> {
+								links.add(new Link(o.getName(), p, d));
+							});
 
-						// 属性
-						Stream.of(c.getAttributes())
-						.filter(a -> filterLabel(a.getName(), keyword))
-						.forEach(a -> {
-							links.add(new Link(a.getName(), p, d));
-						});
-					}
+							// 属性
+							Stream.of(c.getAttributes())
+							.filter(a -> filterLabel(a.getName(), keyword))
+							.forEach(a -> {
+								links.add(new Link(a.getName(), p, d));
+							});
+						}
 
-					// ステレオタイプを確認
-					if(p.getModel() != null) {
-						Stream.of(p.getModel().getStereotypes())
-						.filter(s -> filterLabel(s, keyword))
-						.forEach(s -> links.add(new Link(s, p, d)));
-					}
-
-				});
+						// ステレオタイプを確認
+						if(p.getModel() != null) {
+							Stream.of(p.getModel().getStereotypes())
+							.filter(s -> filterLabel(s, keyword))
+							.forEach(s -> links.add(new Link(s, p, d)));
+						}
+					});
+				}
 			}
 
 		}catch(Exception e) {
@@ -433,24 +480,21 @@ ProjectEventListener
 		} else if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_CONTAINS)){
 			return label.toLowerCase().contains(keyword.toLowerCase());
 
-		} else if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_COLOR)){
-			return true;
-
-		}else {
+		} else {
 			return false;
 		}
 	}
 
-	private static final String FONT_COLOR_BLACK = "#000000";
-	private String selectedFontColor = FONT_COLOR_BLACK;
-
-	private boolean filterFontColor(IPresentation p, Color filterColor) {
-		if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_COLOR)) {
-			String fontColor = p.getProperty(FONT_COLOR);
-			return selectedFontColor.equals(fontColor);
-
-		} else {
+	private boolean filterFontColor(IPresentation p) {
+		if(searchColors.getSelectedItem().equals(SEARCH_FONT_COLOR_ALL)) {
 			return true;
+		}
+
+		String fontColor = p.getProperty(PROPERTY_FONT_COLOR);
+		if(searchColors.getSelectedItem().equals(SEARCH_FONT_COLOR_MATCH)){
+			return selectedFontColor.equals(fontColor);
+		} else {
+			return ! selectedFontColor.equals(fontColor);
 		}
 	}
 
@@ -506,34 +550,6 @@ ProjectEventListener
 	@Override
 	public void entitySelectionChanged(IEntitySelectionEvent e) {
 		logger.log(Level.INFO, "entitySelectionChanged");
-
-		if(! searchOptions.getSelectedItem().equals(SEARCH_OPTION_COLOR)) {
-			return;
-		}
-
-		IPresentation[] ps = diagramViewManager.getSelectedPresentations();
-		if (ps.length == 0) {
-			keywordTextField.setBackground(Color.WHITE);
-			selectedFontColor = FONT_COLOR_BLACK;
-			return;
-		}
-
-		IPresentation p = ps[0];
-
-		String fontColor = p.getProperty(FONT_COLOR);
-		if(fontColor.equals("null")) {
-			return;
-		}
-		this.selectedFontColor = fontColor;
-
-		int r = Integer.decode("0x" + fontColor.substring(1,3));
-		int g = Integer.decode("0x" + fontColor.substring(3,5));
-		int b = Integer.decode("0x" + fontColor.substring(5,7));
-
-		keywordTextField.setBackground(new Color(r,g,b));
-		keywordTextField.setText("");
-
-		updateDiagramView();
 	}
 
 	// ProjectEventListener
