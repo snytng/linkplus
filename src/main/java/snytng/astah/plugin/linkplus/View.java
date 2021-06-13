@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
+import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
@@ -26,11 +27,13 @@ import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.RowSorter;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.SwingConstants;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.TableColumnModelEvent;
@@ -122,15 +125,6 @@ ProjectEventListener
 		add(createPane());
 	}
 
-	JPanel scrollPanel = null;
-	JTable linksTable = null;
-	JScrollPane scrollPane = null;
-	JTextField keywordTextField = null;
-	JComboBox<String> searchOptions = null;
-	JComboBox<String> searchTypes = null;
-	JButton fontColorButton = null;
-	JComboBox<String> searchColors = null;
-
 	class Link {
 		String label;
 		IPresentation presentation;
@@ -181,6 +175,17 @@ ProjectEventListener
 		}
 	};
 
+
+	JPanel scrollPanel = null;
+	JTable linksTable = null;
+	JScrollPane scrollPane = null;
+	JTextField keywordTextField = null;
+	JComboBox<String> searchOptions = null;
+	JComboBox<String> searchTypes = null;
+	JButton fontColorButton = null;
+	JComboBox<String> searchColors = null;
+	JComboBox<String> searchDiagrams = null;
+
 	private static final String SEARCH_TYPE_NOTE  = "Note";
 	private static final String SEARCH_TYPE_TOPIC = "Topic";
 	private static final String SEARCH_TYPE_CLASS = "Class";
@@ -192,6 +197,10 @@ ProjectEventListener
 	private static final String SEARCH_FONT_COLOR_ALL       = "全て";
 	private static final String SEARCH_FONT_COLOR_MATCH     = "同じ";
 	private static final String SEARCH_FONT_COLOR_NOT_MATCH = "違う";
+
+	private static final String SEARCH_DIAGRAM_ALL     = "全て";
+	private static final String SEARCH_DIAGRAM_CURRENT = "今の図";
+	private static final String SEARCH_DIAGRAM_PACKAGE = "パッケージ";
 
 	private static final String PROPERTY_FONT_COLOR = "font.color";
 	private static final String FONT_COLOR_BLACK = "#000000";
@@ -284,7 +293,7 @@ ProjectEventListener
 
 			@Override
 			public void keyReleased(KeyEvent e) {
-				updateDiagramView();
+				update();
 			}
 
 			@Override
@@ -299,7 +308,7 @@ ProjectEventListener
 				SEARCH_OPTION_STARTSWITH,
 				SEARCH_OPTION_CONTAINS,
 		});
-		searchOptions.addActionListener(e -> updateDiagramView());
+		searchOptions.addActionListener(e -> update());
 
 		JLabel searchTypesLabel = new JLabel("要素");
 		searchTypes = new JComboBox<>(new String[] {
@@ -308,7 +317,7 @@ ProjectEventListener
 				SEARCH_TYPE_CLASS,
 				SEARCH_TYPE_ALL
 		});
-		searchTypes.addActionListener(e -> updateDiagramView());
+		searchTypes.addActionListener(e -> update());
 
 		fontColorButton = new JButton("文字色");
 		fontColorButton.setForeground(Color.BLACK);
@@ -332,7 +341,7 @@ ProjectEventListener
 
 			fontColorButton.setForeground(new Color(r,g,b));
 
-			updateDiagramView();
+			update();
 		});
 
 		fontColorButton.setMnemonic(KeyEvent.VK_C);
@@ -342,15 +351,30 @@ ProjectEventListener
 				SEARCH_FONT_COLOR_MATCH,
 				SEARCH_FONT_COLOR_NOT_MATCH
 		});
-		searchColors.addActionListener(e -> updateDiagramView());
+		searchColors.addActionListener(e -> update());
 
+		JLabel searchDiagramsLabel = new JLabel("対象図");
+		searchDiagrams= new JComboBox<>(new String[] {
+				SEARCH_DIAGRAM_ALL,
+				SEARCH_DIAGRAM_CURRENT,
+				SEARCH_DIAGRAM_PACKAGE
+		});
+		searchDiagrams.addActionListener(e -> update());
 
 		menuPanel.add(keywordPanel);
 		menuPanel.add(searchOptions);
+
+		menuPanel.add(getSeparator());
 		menuPanel.add(searchTypesLabel);
 		menuPanel.add(searchTypes);
+
+		menuPanel.add(getSeparator());
 		menuPanel.add(fontColorButton);
 		menuPanel.add(searchColors);
+
+		menuPanel.add(getSeparator());
+		menuPanel.add(searchDiagramsLabel);
+		menuPanel.add(searchDiagrams);
 
 		JPanel topPanel = new JPanel();
 		topPanel.setLayout(new BorderLayout());
@@ -358,6 +382,17 @@ ProjectEventListener
 		topPanel.add(scrollPane, BorderLayout.CENTER);
 
 		return topPanel;
+	}
+
+	private JSeparator getSeparator(){
+		return new JSeparator(SwingConstants.VERTICAL){
+			@Override public Dimension getPreferredSize() {
+				return new Dimension(1, 16);
+			}
+			@Override public Dimension getMaximumSize() {
+				return this.getPreferredSize();
+			}
+		};
 	}
 
 	private void showDiagram() {
@@ -381,10 +416,10 @@ ProjectEventListener
 		}
 	}
 
-	private void getPresentationsWithLabel(String keyword) {
-		links = new ArrayList<>();
+	private void getPresentationsInAllDiagramsWithLabel(String keyword) {
 		try {
 			IPackage root = projectAccessor.getProject();
+
 			List<IPackage> ps = new ArrayList<>();
 			ps.add(root);
 			getPackages(root, ps);
@@ -393,6 +428,53 @@ ProjectEventListener
 					.flatMap(p -> Stream.of(p.getDiagrams()))
 					.collect(Collectors.toList());
 
+			getPresentationsWithLabel(ds, keyword);
+
+		}catch(Exception e) {
+		}
+	}
+
+	private void getPresentationsInDiagramsOfSamePackageWithLabel(String keyword) {
+		try {
+			IDiagram d = diagramViewManager.getCurrentDiagram();
+
+			if (d == null) {
+				return;
+			}
+
+			List<IPackage> ps = new ArrayList<>();
+			ps.add((IPackage)d.getOwner());
+
+			List<IDiagram> ds = ps.stream()
+					.flatMap(p -> Stream.of(p.getDiagrams()))
+					.collect(Collectors.toList());
+
+			getPresentationsWithLabel(ds, keyword);
+
+		}catch(Exception e) {
+		}
+	}
+
+	private void getPresentationsInCurrentDiagramWithLabel(String keyword) {
+		try {
+			IDiagram d = diagramViewManager.getCurrentDiagram();
+
+			if (d == null) {
+				return;
+			}
+
+			List<IDiagram> ds = new ArrayList<>();
+			ds.add(d);
+
+			getPresentationsWithLabel(ds, keyword);
+
+		}catch(Exception e) {
+		}
+	}
+
+	private void getPresentationsWithLabel(List<IDiagram> ds, String keyword) {
+		links = new ArrayList<>();
+		try {
 			// ダイアグラムを巡回
 			for(IDiagram d : ds) {
 
@@ -445,9 +527,7 @@ ProjectEventListener
 					});
 				}
 			}
-
-		}catch(Exception e) {
-			e.printStackTrace();
+		} catch(Exception e) {
 		}
 
 	}
@@ -511,11 +591,17 @@ ProjectEventListener
 	/**
 	 * 表示を更新する
 	 */
-	private void updateDiagramView() {
+	private void update() {
 		try {
-			logger.log(Level.INFO, "update diagram view.");
+			logger.log(Level.INFO, "update view.");
 
-			getPresentationsWithLabel(keywordTextField.getText());
+			if(searchDiagrams.getSelectedItem().equals(SEARCH_DIAGRAM_CURRENT)){
+				getPresentationsInCurrentDiagramWithLabel(keywordTextField.getText());
+			} else if(searchDiagrams.getSelectedItem().equals(SEARCH_DIAGRAM_PACKAGE)){
+				getPresentationsInDiagramsOfSamePackageWithLabel(keywordTextField.getText());
+			} else {
+				getPresentationsInAllDiagramsWithLabel(keywordTextField.getText());
+			}
 
 			tableModel.setRowCount(0);
 
@@ -560,7 +646,7 @@ ProjectEventListener
 	@Override
 	public void projectChanged(ProjectEvent e) {
 		logger.log(Level.INFO, "projectChanged");
-		updateDiagramView();
+		update();
 	}
 
 	@Override
@@ -584,7 +670,7 @@ ProjectEventListener
 		// リスナーへの登録
 		addDiagramListeners();
 		// 再表示されたら表示を更新
-		updateDiagramView();
+		update();
 	}
 
 	@Override
