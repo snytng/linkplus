@@ -44,6 +44,7 @@ import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableModel;
 
 import com.change_vision.jude.api.inf.AstahAPI;
+import com.change_vision.jude.api.inf.exception.InvalidUsingException;
 import com.change_vision.jude.api.inf.model.IClass;
 import com.change_vision.jude.api.inf.model.IDiagram;
 import com.change_vision.jude.api.inf.model.IElement;
@@ -395,26 +396,53 @@ ProjectEventListener
 		};
 	}
 
+	private IDiagram lastSelectedDiagram = null;
+
 	private void showDiagram() {
 		int row = linksTable.getSelectedRow();
 		int col = linksTable.getSelectedColumn();
 
 		logger.log(Level.INFO, () -> "notesTable select (" + row + "," + col + ")");
 
-		// 未選択状態
-		if(row < 0) {
-			return;
-		}
+		try {
+			if(lastSelectedDiagram != null) {
+				diagramViewManager.clearAllViewProperties(lastSelectedDiagram);
+			}
 
-		Link link = (Link)linksTable.getValueAt(row, 0);
-		diagramViewManager.open(link.diagram);
-		if(col == 0) {
+			// 未選択状態
+			if(row < 0) {
+				return;
+			}
+
+			Link link = (Link)linksTable.getValueAt(row, 0);
+
+			diagramViewManager.open(link.diagram);
+			diagramViewManager.unselectAll();
 			diagramViewManager.select(link.presentation);
 			diagramViewManager.showInDiagramEditor(link.presentation);
-		} else {
-			diagramViewManager.unselectAll();
+
+			diagramViewManager.clearAllViewProperties(link.diagram);
+			lastSelectedDiagram = link.diagram;
+
+			diagramViewManager.getViewProperties(link.presentation).keySet().stream()
+			.forEach(k -> {
+				try {
+					System.out.println("key:" + k + "=" + diagramViewManager.getViewProperty(link.presentation, k));
+				}catch(InvalidUsingException e) {
+					e.printStackTrace();
+				}
+			});
+
+			diagramViewManager.setViewProperty(
+					link.presentation,
+					IDiagramViewManager.BORDER_COLOR,
+					Color.MAGENTA);
+
+		}catch(InvalidUsingException e) {
+			e.printStackTrace();
 		}
 	}
+
 
 	private void getPresentationsInAllDiagramsWithLabel(String keyword) {
 		try {
