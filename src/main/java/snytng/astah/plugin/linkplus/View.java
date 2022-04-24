@@ -13,6 +13,7 @@ import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
@@ -86,7 +87,7 @@ ProjectEventListener
 	/**
 	 * プロパティファイルの配置場所
 	 */
-	private static final String VIEW_PROPERTIES = "snytng.astah.plugin.linkplus.view";
+	private static final String VIEW_PROPERTIES = View.class.getPackage().getName() + ".view";
 
 	/**
 	 * リソースバンドル
@@ -187,28 +188,59 @@ ProjectEventListener
 	JComboBox<String> searchColors = null;
 	JComboBox<String> searchDiagrams = null;
 
-	private static final String SEARCH_TYPE_NOTE  = "Note";
-	private static final String SEARCH_TYPE_TOPIC = "Topic";
-	private static final String SEARCH_TYPE_CLASS = "Class";
-	private static final String SEARCH_TYPE_ALL   = "全て";
+	private enum SEARCH_TYPE {
+		ALL("すべて"),
+		NOTE("Note"),
+		TOPIC("Topic"),
+		CLASS("Class");
 
-	private static final String SEARCH_OPTION_STARTSWITH = "前方一致";
-	private static final String SEARCH_OPTION_CONTAINS   = "含む";
+		private final String text;
+		private SEARCH_TYPE(final String text) {
+			this.text = text;
+		}
+	}
 
-	private static final String SEARCH_FONT_COLOR_ALL       = "全て";
-	private static final String SEARCH_FONT_COLOR_MATCH     = "同じ";
-	private static final String SEARCH_FONT_COLOR_NOT_MATCH = "違う";
+	private static final String INITIAL_SEARCH_KEYWORD = "TODO";
+	private enum SEARCH_OPTION {
+		STARTSWITH("前方一致"),
+		CONTAINS("含む");
 
-	private static final String SEARCH_DIAGRAM_ALL     = "全て";
-	private static final String SEARCH_DIAGRAM_CURRENT = "今の図";
-	private static final String SEARCH_DIAGRAM_PACKAGE = "パッケージ";
+		private final String text;
+		private SEARCH_OPTION(final String text) {
+			this.text = text;
+		}
+	}
+
+	private enum SEARCH_FONT {
+		COLOR_ALL("すべて"),
+		COLOR_MATCH("同じ"),
+		NOT_MATCH("違う");
+
+		private final String text;
+		private SEARCH_FONT(final String text) {
+			this.text = text;
+		}
+	}
+
+	private enum SEARCH_DIAGRAM {
+		ALL("すべて"),
+		CURRENT("今の図"),
+		PACKAGE("パッケージ");
+
+		private final String text;
+		private SEARCH_DIAGRAM(final String text) {
+			this.text = text;
+		}
+
+	}
 
 	private static final String PROPERTY_FONT_COLOR = "font.color";
 	private static final String FONT_COLOR_BLACK = "#000000";
 	private String selectedFontColor = FONT_COLOR_BLACK;
 
-	public Container createPane() {
+	private boolean isAtRow0inLinksTable = false;
 
+	public Container createPane() {
 		linksTable = new JTable(tableModel);
 		linksTable.setRowSelectionAllowed(true);    // 行選択を可能にする
 		linksTable.setColumnSelectionAllowed(true); // 列選択を可能にする
@@ -219,13 +251,22 @@ ProjectEventListener
 
 		linksTable.getSelectionModel().addListSelectionListener(e -> {
 			logger.log(Level.INFO, "ListSelectionListener");
+			// 選択操作中は何もしない
+			if (e.getValueIsAdjusting()) {
+				return;
+			}
 			showDiagram();
 			linksTable.requestFocusInWindow();
 		});
+
 		linksTable.getColumnModel().addColumnModelListener(new TableColumnModelListener() {
 			@Override
 			public void columnSelectionChanged(ListSelectionEvent e) {
 				logger.log(Level.INFO, "TableColumnModelListener columnSelectionChanged");
+				// 選択操作中は何もしない
+				if (e.getValueIsAdjusting()) {
+					return;
+				}
 				showDiagram();
 				linksTable.requestFocusInWindow();
 			}
@@ -275,6 +316,36 @@ ProjectEventListener
 			}
 		});
 
+		linksTable.addKeyListener(new KeyListener() {
+			@Override
+			public void keyTyped(KeyEvent e) {
+				// no action
+			}
+
+			@Override
+			public void keyPressed(KeyEvent e) {
+				// no action
+			}
+
+			@Override
+			public void keyReleased(KeyEvent e) {
+				// linksTableの一番上のセルでUPキーを押したら、
+				// keywordTextFieldへフォーカスを移動する
+				if (e.getKeyCode() == KeyEvent.VK_UP
+						&&
+						isAtRow0inLinksTable) {
+					linksTable.clearSelection();
+					keywordTextField.requestFocusInWindow();
+				}
+				// linksTableの一番上のセルかどうかを確認
+				if(linksTable.getSelectedRow() == 0) {
+					isAtRow0inLinksTable = true;
+				} else {
+					isAtRow0inLinksTable = false;
+				}
+			}
+		});
+
 		scrollPane = new JScrollPane(
 				linksTable,
 				ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
@@ -285,7 +356,7 @@ ProjectEventListener
 
 		JPanel keywordPanel = new JPanel();
 		JLabel keywordLabel = new JLabel("キーワード");
-		keywordTextField = new JTextField("TODO", 10);
+		keywordTextField = new JTextField(INITIAL_SEARCH_KEYWORD, 10);
 		keywordTextField.addKeyListener(new KeyListener() {
 			@Override
 			public void keyTyped(KeyEvent e) {
@@ -295,6 +366,17 @@ ProjectEventListener
 			@Override
 			public void keyReleased(KeyEvent e) {
 				update();
+				// DOWNキーを押したら、linksTableの一番左上にフォーカスを移動する
+				if (e.getKeyCode() == KeyEvent.VK_DOWN
+						&&
+						linksTable.getRowCount() > 0) {
+					linksTable.setRowSelectionInterval(0,  0);
+					linksTable.setColumnSelectionInterval(0,  0);
+					isAtRow0inLinksTable = true;
+					linksTable.requestFocusInWindow();
+					return;
+				}
+				keywordTextField.requestFocusInWindow();
 			}
 
 			@Override
@@ -305,19 +387,17 @@ ProjectEventListener
 		keywordPanel.add(keywordLabel);
 		keywordPanel.add(keywordTextField);
 
-		searchOptions = new JComboBox<>(new String[] {
-				SEARCH_OPTION_STARTSWITH,
-				SEARCH_OPTION_CONTAINS,
-		});
+		searchOptions = new JComboBox<>(
+				Arrays.stream(SEARCH_OPTION.values())
+				.map(v -> v.text).toArray(String[]::new)
+				);
 		searchOptions.addActionListener(e -> update());
 
 		JLabel searchTypesLabel = new JLabel("要素");
-		searchTypes = new JComboBox<>(new String[] {
-				SEARCH_TYPE_NOTE,
-				SEARCH_TYPE_TOPIC,
-				SEARCH_TYPE_CLASS,
-				SEARCH_TYPE_ALL
-		});
+		searchTypes = new JComboBox<>(
+				Arrays.stream(SEARCH_TYPE.values())
+				.map(v -> v.text).toArray(String[]::new)
+				);
 		searchTypes.addActionListener(e -> update());
 
 		fontColorButton = new JButton("文字色");
@@ -347,19 +427,17 @@ ProjectEventListener
 
 		fontColorButton.setMnemonic(KeyEvent.VK_C);
 
-		searchColors = new JComboBox<>(new String[] {
-				SEARCH_FONT_COLOR_ALL,
-				SEARCH_FONT_COLOR_MATCH,
-				SEARCH_FONT_COLOR_NOT_MATCH
-		});
+		searchColors = new JComboBox<>(
+				Arrays.stream(SEARCH_FONT.values())
+				.map(v -> v.text).toArray(String[]::new)
+				);
 		searchColors.addActionListener(e -> update());
 
 		JLabel searchDiagramsLabel = new JLabel("対象図");
-		searchDiagrams= new JComboBox<>(new String[] {
-				SEARCH_DIAGRAM_ALL,
-				SEARCH_DIAGRAM_CURRENT,
-				SEARCH_DIAGRAM_PACKAGE
-		});
+		searchDiagrams= new JComboBox<>(
+				Arrays.stream(SEARCH_DIAGRAM.values())
+				.map(v -> v.text).toArray(String[]::new)
+				);
 		searchDiagrams.addActionListener(e -> update());
 
 		menuPanel.add(keywordPanel);
@@ -396,7 +474,7 @@ ProjectEventListener
 		};
 	}
 
-	private IDiagram lastSelectedDiagram = null;
+	private transient IDiagram lastSelectedDiagram = null;
 
 	private void showDiagram() {
 		int row = linksTable.getSelectedRow();
@@ -427,7 +505,8 @@ ProjectEventListener
 			diagramViewManager.getViewProperties(link.presentation).keySet().stream()
 			.forEach(k -> {
 				try {
-					System.out.println("key:" + k + "=" + diagramViewManager.getViewProperty(link.presentation, k));
+					String message = "key:" + k + "=" + diagramViewManager.getViewProperty(link.presentation, k);
+					logger.log(Level.INFO, () -> message);
 				}catch(InvalidUsingException e) {
 					e.printStackTrace();
 				}
@@ -507,7 +586,7 @@ ProjectEventListener
 			for(IDiagram d : ds) {
 
 				// 色選択の場合
-				if (! searchColors.getSelectedItem().equals(SEARCH_FONT_COLOR_ALL)) {
+				if (! searchColors.getSelectedItem().equals(SEARCH_FONT.COLOR_ALL.text)) {
 					// Presentationを登録
 					Stream.of(d.getPresentations())
 					.filter(p -> filterType(p.getType()))
@@ -525,7 +604,7 @@ ProjectEventListener
 
 					// 全てを選択した場合には、クラス要素とステレオタイプを登録
 					Stream.of(d.getPresentations())
-					.filter(p -> searchTypes.getSelectedItem().equals(SEARCH_TYPE_ALL))
+					.filter(p -> searchTypes.getSelectedItem().equals(SEARCH_TYPE.ALL.text))
 					.forEach(p -> {
 						// クラスの場合にはメソッドと属性を確認
 						if(p.getType().equals("Class")) {
@@ -565,7 +644,7 @@ ProjectEventListener
 			return false;
 		}
 
-		return searchTypes.getSelectedItem().equals(SEARCH_TYPE_ALL) ||
+		return searchTypes.getSelectedItem().equals(SEARCH_TYPE.ALL.text) ||
 				type.equals(searchTypes.getSelectedItem());
 	}
 
@@ -582,10 +661,10 @@ ProjectEventListener
 			return true;
 		}
 
-		if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_STARTSWITH)) {
+		if(searchOptions.getSelectedItem().equals(SEARCH_OPTION.STARTSWITH.text)) {
 			return label.toLowerCase().startsWith(keyword.toLowerCase());
 
-		} else if(searchOptions.getSelectedItem().equals(SEARCH_OPTION_CONTAINS)){
+		} else if(searchOptions.getSelectedItem().equals(SEARCH_OPTION.CONTAINS.text)){
 			return label.toLowerCase().contains(keyword.toLowerCase());
 
 		} else {
@@ -594,12 +673,12 @@ ProjectEventListener
 	}
 
 	private boolean filterFontColor(IPresentation p) {
-		if(searchColors.getSelectedItem().equals(SEARCH_FONT_COLOR_ALL)) {
+		if(searchColors.getSelectedItem().equals(SEARCH_FONT.COLOR_ALL.text)) {
 			return true;
 		}
 
 		String fontColor = p.getProperty(PROPERTY_FONT_COLOR);
-		if(searchColors.getSelectedItem().equals(SEARCH_FONT_COLOR_MATCH)){
+		if(searchColors.getSelectedItem().equals(SEARCH_FONT.COLOR_MATCH.text)){
 			return selectedFontColor.equals(fontColor);
 		} else {
 			return ! selectedFontColor.equals(fontColor);
@@ -623,9 +702,9 @@ ProjectEventListener
 		try {
 			logger.log(Level.INFO, "update view.");
 
-			if(searchDiagrams.getSelectedItem().equals(SEARCH_DIAGRAM_CURRENT)){
+			if(searchDiagrams.getSelectedItem().equals(SEARCH_DIAGRAM.CURRENT.text)){
 				getPresentationsInCurrentDiagramWithLabel(keywordTextField.getText());
-			} else if(searchDiagrams.getSelectedItem().equals(SEARCH_DIAGRAM_PACKAGE)){
+			} else if(searchDiagrams.getSelectedItem().equals(SEARCH_DIAGRAM.PACKAGE.text)){
 				getPresentationsInDiagramsOfSamePackageWithLabel(keywordTextField.getText());
 			} else {
 				getPresentationsInAllDiagramsWithLabel(keywordTextField.getText());
