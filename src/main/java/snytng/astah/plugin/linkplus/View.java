@@ -415,12 +415,7 @@ ProjectEventListener
 				return;
 			}
 			this.selectedFontColor = fontColor;
-
-			int r = Integer.decode("0x" + fontColor.substring(1,3));
-			int g = Integer.decode("0x" + fontColor.substring(3,5));
-			int b = Integer.decode("0x" + fontColor.substring(5,7));
-
-			fontColorButton.setForeground(new Color(r,g,b));
+			fontColorButton.setForeground(Color.decode(this.selectedFontColor));
 
 			update();
 		});
