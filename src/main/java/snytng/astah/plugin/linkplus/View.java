@@ -48,7 +48,6 @@ import com.change_vision.jude.api.inf.AstahAPI;
 import com.change_vision.jude.api.inf.exception.InvalidUsingException;
 import com.change_vision.jude.api.inf.model.IClass;
 import com.change_vision.jude.api.inf.model.IDiagram;
-import com.change_vision.jude.api.inf.model.IElement;
 import com.change_vision.jude.api.inf.model.INamedElement;
 import com.change_vision.jude.api.inf.model.IPackage;
 import com.change_vision.jude.api.inf.presentation.IPresentation;
@@ -94,7 +93,7 @@ ProjectEventListener
 	 */
 	private static final ResourceBundle VIEW_BUNDLE = ResourceBundle.getBundle(VIEW_PROPERTIES, Locale.getDefault());
 
-	private String title = "<linkplus>";
+	private String title = "<Link+>";
 	private String description = "<This plugin lists notes with a specific string and shows diagram of them.>";
 
 	private static final long serialVersionUID = 1L;
@@ -127,47 +126,14 @@ ProjectEventListener
 		add(createPane());
 	}
 
-	class Link {
-		String label;
-		IPresentation presentation;
-		IDiagram diagram;
-
-		Link(IPresentation presentation, IDiagram diagram){
-			this.label = presentation.getLabel();
-			this.presentation = presentation;
-			this.diagram = diagram;
-		}
-
-		Link(String label, IPresentation presentation, IDiagram diagram){
-			this.label = label;
-			this.presentation = presentation;
-			this.diagram = diagram;
-		}
-
-		public String getLabel() {
-			return label;
-		}
-
-		public String getPackageName() {
-			StringBuilder sb = new StringBuilder();
-			IElement owner = diagram.getOwner();
-			while (owner instanceof INamedElement && owner.getOwner() != null) {
-				sb.insert(0, ((INamedElement) owner).getName() + "::");
-				owner = owner.getOwner();
-			}
-			return sb.toString();
-		}
-
-		public String toString() {
-			return getLabel();
-		}
-
-
-	}
-
 	private transient List<Link> links = new ArrayList<>();
 
-	private String[] columnNames = new String[]{"ノード", "属性", "ダイアグラム", "パス"};
+	private String[] columnNames = new String[]{
+			VIEW_BUNDLE.getString("View.linktable.column_name.node"),
+			VIEW_BUNDLE.getString("View.linktable.column_name.attribute"),
+			VIEW_BUNDLE.getString("View.linktable.column_name.diagram"),
+			VIEW_BUNDLE.getString("View.linktable.column_name.path")
+			};
 
 	@SuppressWarnings("serial")
 	private DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
@@ -176,7 +142,6 @@ ProjectEventListener
 			return false;
 		}
 	};
-
 
 	JPanel scrollPanel = null;
 	JTable linksTable = null;
@@ -188,8 +153,9 @@ ProjectEventListener
 	JComboBox<String> searchColors = null;
 	JComboBox<String> searchDiagrams = null;
 
+	private static final String SEARCH_TYPES_LABEL = VIEW_BUNDLE.getString("View.search_type.label");
 	private enum SEARCH_TYPE {
-		ALL("すべて"),
+		ALL(VIEW_BUNDLE.getString("View.search_type.all")),
 		NOTE("Note"),
 		TOPIC("Topic"),
 		CLASS("Class");
@@ -200,10 +166,12 @@ ProjectEventListener
 		}
 	}
 
-	private static final String INITIAL_SEARCH_KEYWORD = "TODO";
+	private static final String SEARCH_KEYWORD_LABEL = VIEW_BUNDLE.getString("View.search_keyword.label");
+	private static final String INITIAL_SEARCH_KEYWORD = VIEW_BUNDLE.getString("View.initial_search_keyword");
+
 	private enum SEARCH_OPTION {
-		STARTSWITH("前方一致"),
-		CONTAINS("含む");
+		STARTSWITH(VIEW_BUNDLE.getString("View.search_option.startswith")),
+		CONTAINS(VIEW_BUNDLE.getString("View.search_option.contains"));
 
 		private final String text;
 		private SEARCH_OPTION(final String text) {
@@ -211,10 +179,11 @@ ProjectEventListener
 		}
 	}
 
+	private static final String FONT_COLOR_BUTTON_LABEL = VIEW_BUNDLE.getString("View.search_font_color.label");
 	private enum SEARCH_FONT {
-		COLOR_ALL("すべて"),
-		COLOR_MATCH("同じ"),
-		NOT_MATCH("違う");
+		COLOR_ALL(VIEW_BUNDLE.getString("View.search_font.color_all")),
+		COLOR_MATCH(VIEW_BUNDLE.getString("View.search_font.color_match")),
+		NOT_MATCH(VIEW_BUNDLE.getString("View.search_font.color_not_match"));
 
 		private final String text;
 		private SEARCH_FONT(final String text) {
@@ -222,10 +191,12 @@ ProjectEventListener
 		}
 	}
 
+	private static final String SEARCH_DIAGRAMS_LABEL = VIEW_BUNDLE.getString("View.search_diagram.label");
+
 	private enum SEARCH_DIAGRAM {
-		ALL("すべて"),
-		CURRENT("今の図"),
-		PACKAGE("パッケージ");
+		ALL(VIEW_BUNDLE.getString("View.search_diagram.all")),
+		CURRENT(VIEW_BUNDLE.getString("View.search_diagram.current")),
+		PACKAGE(VIEW_BUNDLE.getString("View.search_diagram.package"));
 
 		private final String text;
 		private SEARCH_DIAGRAM(final String text) {
@@ -307,11 +278,7 @@ ProjectEventListener
 				}
 				int column = columnModel.getColumn(viewColumn).getModelIndex();
 				if (column != -1 && e.isShiftDown()) {
-					EventQueue.invokeLater(new Runnable() {
-						@Override public void run() {
-							sorter.setSortKeys(null);
-						}
-					});
+					EventQueue.invokeLater(() -> sorter.setSortKeys(null));
 				}
 			}
 		});
@@ -355,7 +322,7 @@ ProjectEventListener
 		menuPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
 
 		JPanel keywordPanel = new JPanel();
-		JLabel keywordLabel = new JLabel("キーワード");
+		JLabel keywordLabel = new JLabel(SEARCH_KEYWORD_LABEL);
 		keywordTextField = new JTextField(INITIAL_SEARCH_KEYWORD, 10);
 		keywordTextField.addKeyListener(new KeyListener() {
 			@Override
@@ -393,14 +360,14 @@ ProjectEventListener
 				);
 		searchOptions.addActionListener(e -> update());
 
-		JLabel searchTypesLabel = new JLabel("要素");
+		JLabel searchTypesLabel = new JLabel(SEARCH_TYPES_LABEL);
 		searchTypes = new JComboBox<>(
 				Arrays.stream(SEARCH_TYPE.values())
 				.map(v -> v.text).toArray(String[]::new)
 				);
 		searchTypes.addActionListener(e -> update());
 
-		fontColorButton = new JButton("文字色");
+		fontColorButton = new JButton(FONT_COLOR_BUTTON_LABEL);
 		fontColorButton.setForeground(Color.BLACK);
 		fontColorButton.addActionListener(e -> {
 			IPresentation[] ps = diagramViewManager.getSelectedPresentations();
@@ -428,7 +395,7 @@ ProjectEventListener
 				);
 		searchColors.addActionListener(e -> update());
 
-		JLabel searchDiagramsLabel = new JLabel("対象図");
+		JLabel searchDiagramsLabel = new JLabel(SEARCH_DIAGRAMS_LABEL);
 		searchDiagrams= new JComboBox<>(
 				Arrays.stream(SEARCH_DIAGRAM.values())
 				.map(v -> v.text).toArray(String[]::new)
@@ -533,6 +500,7 @@ ProjectEventListener
 			getPresentationsWithLabel(ds, keyword);
 
 		}catch(Exception e) {
+			logger.log(Level.WARNING, e.getMessage(), e);
 		}
 	}
 
@@ -554,6 +522,7 @@ ProjectEventListener
 			getPresentationsWithLabel(ds, keyword);
 
 		}catch(Exception e) {
+			logger.log(Level.WARNING, e.getMessage(), e);
 		}
 	}
 
@@ -571,6 +540,7 @@ ProjectEventListener
 			getPresentationsWithLabel(ds, keyword);
 
 		}catch(Exception e) {
+			logger.log(Level.WARNING, e.getMessage(), e);
 		}
 	}
 
@@ -608,16 +578,12 @@ ProjectEventListener
 							// メソッド
 							Stream.of(c.getOperations())
 							.filter(o -> filterLabel(o.getName(), keyword))
-							.forEach(o -> {
-								links.add(new Link(o.getName(), p, d));
-							});
+							.forEach(o -> links.add(new Link(o.getName(), p, d)));
 
 							// 属性
 							Stream.of(c.getAttributes())
 							.filter(a -> filterLabel(a.getName(), keyword))
-							.forEach(a -> {
-								links.add(new Link(a.getName(), p, d));
-							});
+							.forEach(a -> links.add(new Link(a.getName(), p, d)));
 						}
 
 						// ステレオタイプを確認
@@ -630,6 +596,7 @@ ProjectEventListener
 				}
 			}
 		} catch(Exception e) {
+			logger.log(Level.WARNING, e.getMessage(), e);
 		}
 
 	}
