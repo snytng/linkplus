@@ -10,7 +10,7 @@
 	</properties>
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>snytng.astah.plugin.linkplus</groupId>
-	<version>0.2.5</version>
+	<version>0.2.6</version>
 	<packaging>bundle</packaging>
 	<pluginRepositories>
 		<pluginRepository>

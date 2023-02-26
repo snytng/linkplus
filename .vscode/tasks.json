@@ -1,0 +1,37 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "build astah* plugin",
+        "detail": "astah* pluginをビルドします",
+        "type": "shell",
+        "command": "astah-mvn",
+        "args": [
+          "clean",
+          "compile"
+        ],
+        "group": "build",
+        "presentation": {
+          "reveal": "always",
+          "clear": true,
+          "echo": false
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "launch astah* plugin",
+        "detail": "astah* pluginを実行します",
+        "type": "shell",
+        "command": "astah-launch",
+        "args": [
+          ""
+        ],
+        "presentation": {
+          "reveal": "always",
+          "clear": true,
+          "echo": false
+        },
+        "problemMatcher": []
+      }
+    ]
+  }

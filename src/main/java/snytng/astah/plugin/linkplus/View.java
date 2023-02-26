@@ -62,16 +62,14 @@ import com.change_vision.jude.api.inf.view.IDiagramViewManager;
 import com.change_vision.jude.api.inf.view.IEntitySelectionEvent;
 import com.change_vision.jude.api.inf.view.IEntitySelectionListener;
 
-
 public class View
-extends
-JPanel
-implements
-IPluginExtraTabView,
-IEntitySelectionListener,
-IDiagramEditorSelectionListener,
-ProjectEventListener
-{
+		extends
+		JPanel
+		implements
+		IPluginExtraTabView,
+		IEntitySelectionListener,
+		IDiagramEditorSelectionListener,
+		ProjectEventListener {
 	/**
 	 * logger
 	 */
@@ -104,7 +102,7 @@ ProjectEventListener
 		try {
 			projectAccessor = AstahAPI.getAstahAPI().getProjectAccessor();
 			diagramViewManager = projectAccessor.getViewManager().getDiagramViewManager();
-		} catch (Exception e){
+		} catch (Exception e) {
 			logger.log(Level.WARNING, e.getMessage(), e);
 		}
 
@@ -116,29 +114,30 @@ ProjectEventListener
 		try {
 			title = VIEW_BUNDLE.getString("pluginExtraTabView.title");
 			description = VIEW_BUNDLE.getString("pluginExtraTabView.description");
-		}catch(Exception e){
+		} catch (Exception e) {
 			logger.log(Level.WARNING, e.getMessage(), e);
 		}
 	}
 
 	private void initComponents() {
-		setLayout(new GridLayout(1,1));
+		setLayout(new GridLayout(1, 1));
 		add(createPane());
 	}
 
 	private transient List<Link> links = new ArrayList<>();
 
-	private String[] columnNames = new String[]{
+	private String[] columnNames = new String[] {
 			VIEW_BUNDLE.getString("View.linktable.column_name.node"),
 			VIEW_BUNDLE.getString("View.linktable.column_name.attribute"),
 			VIEW_BUNDLE.getString("View.linktable.column_name.diagram"),
 			VIEW_BUNDLE.getString("View.linktable.column_name.path")
-			};
+	};
 
 	@SuppressWarnings("serial")
 	private DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
 		// セル編集できないようにする
-		@Override public boolean isCellEditable(int row, int column) {
+		@Override
+		public boolean isCellEditable(int row, int column) {
 			return false;
 		}
 	};
@@ -154,6 +153,7 @@ ProjectEventListener
 	JComboBox<String> searchDiagrams = null;
 
 	private static final String SEARCH_TYPES_LABEL = VIEW_BUNDLE.getString("View.search_type.label");
+
 	private enum SEARCH_TYPE {
 		ALL(VIEW_BUNDLE.getString("View.search_type.all")),
 		NOTE("Note"),
@@ -161,6 +161,7 @@ ProjectEventListener
 		CLASS("Class");
 
 		private final String text;
+
 		private SEARCH_TYPE(final String text) {
 			this.text = text;
 		}
@@ -174,18 +175,21 @@ ProjectEventListener
 		CONTAINS(VIEW_BUNDLE.getString("View.search_option.contains"));
 
 		private final String text;
+
 		private SEARCH_OPTION(final String text) {
 			this.text = text;
 		}
 	}
 
 	private static final String FONT_COLOR_BUTTON_LABEL = VIEW_BUNDLE.getString("View.search_font_color.label");
+
 	private enum SEARCH_FONT {
 		COLOR_ALL(VIEW_BUNDLE.getString("View.search_font.color_all")),
 		COLOR_MATCH(VIEW_BUNDLE.getString("View.search_font.color_match")),
 		NOT_MATCH(VIEW_BUNDLE.getString("View.search_font.color_not_match"));
 
 		private final String text;
+
 		private SEARCH_FONT(final String text) {
 			this.text = text;
 		}
@@ -199,6 +203,7 @@ ProjectEventListener
 		PACKAGE(VIEW_BUNDLE.getString("View.search_diagram.package"));
 
 		private final String text;
+
 		private SEARCH_DIAGRAM(final String text) {
 			this.text = text;
 		}
@@ -213,10 +218,10 @@ ProjectEventListener
 
 	public Container createPane() {
 		linksTable = new JTable(tableModel);
-		linksTable.setRowSelectionAllowed(true);    // 行選択を可能にする
+		linksTable.setRowSelectionAllowed(true); // 行選択を可能にする
 		linksTable.setColumnSelectionAllowed(true); // 列選択を可能にする
-		linksTable.setCellSelectionEnabled(true);   // セル選択を可能にする
-		linksTable.setAutoCreateRowSorter(true);    // ソートを可能にする
+		linksTable.setCellSelectionEnabled(true); // セル選択を可能にする
+		linksTable.setAutoCreateRowSorter(true); // ソートを可能にする
 		linksTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
 		linksTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
@@ -265,7 +270,8 @@ ProjectEventListener
 
 		// ヘッダーをShiftキーを押しながらクリックするとソート状態を解除する
 		linksTable.getTableHeader().addMouseListener(new MouseAdapter() {
-			@Override public void mouseClicked(MouseEvent e) {
+			@Override
+			public void mouseClicked(MouseEvent e) {
 				final RowSorter<? extends TableModel> sorter = linksTable.getRowSorter();
 				if (sorter == null || sorter.getSortKeys().isEmpty()) {
 					return;
@@ -305,7 +311,7 @@ ProjectEventListener
 					keywordTextField.requestFocusInWindow();
 				}
 				// linksTableの一番上のセルかどうかを確認
-				if(linksTable.getSelectedRow() == 0) {
+				if (linksTable.getSelectedRow() == 0) {
 					isAtRow0inLinksTable = true;
 				} else {
 					isAtRow0inLinksTable = false;
@@ -337,8 +343,8 @@ ProjectEventListener
 				if (e.getKeyCode() == KeyEvent.VK_DOWN
 						&&
 						linksTable.getRowCount() > 0) {
-					linksTable.setRowSelectionInterval(0,  0);
-					linksTable.setColumnSelectionInterval(0,  0);
+					linksTable.setRowSelectionInterval(0, 0);
+					linksTable.setColumnSelectionInterval(0, 0);
 					isAtRow0inLinksTable = true;
 					linksTable.requestFocusInWindow();
 					return;
@@ -356,15 +362,13 @@ ProjectEventListener
 
 		searchOptions = new JComboBox<>(
 				Arrays.stream(SEARCH_OPTION.values())
-				.map(v -> v.text).toArray(String[]::new)
-				);
+						.map(v -> v.text).toArray(String[]::new));
 		searchOptions.addActionListener(e -> update());
 
 		JLabel searchTypesLabel = new JLabel(SEARCH_TYPES_LABEL);
 		searchTypes = new JComboBox<>(
 				Arrays.stream(SEARCH_TYPE.values())
-				.map(v -> v.text).toArray(String[]::new)
-				);
+						.map(v -> v.text).toArray(String[]::new));
 		searchTypes.addActionListener(e -> update());
 
 		fontColorButton = new JButton(FONT_COLOR_BUTTON_LABEL);
@@ -378,7 +382,7 @@ ProjectEventListener
 			IPresentation p = ps[0];
 
 			String fontColor = p.getProperty(PROPERTY_FONT_COLOR);
-			if(fontColor.equals("null")) {
+			if (fontColor.equals("null")) {
 				return;
 			}
 			this.selectedFontColor = fontColor;
@@ -391,15 +395,13 @@ ProjectEventListener
 
 		searchColors = new JComboBox<>(
 				Arrays.stream(SEARCH_FONT.values())
-				.map(v -> v.text).toArray(String[]::new)
-				);
+						.map(v -> v.text).toArray(String[]::new));
 		searchColors.addActionListener(e -> update());
 
 		JLabel searchDiagramsLabel = new JLabel(SEARCH_DIAGRAMS_LABEL);
-		searchDiagrams= new JComboBox<>(
+		searchDiagrams = new JComboBox<>(
 				Arrays.stream(SEARCH_DIAGRAM.values())
-				.map(v -> v.text).toArray(String[]::new)
-				);
+						.map(v -> v.text).toArray(String[]::new));
 		searchDiagrams.addActionListener(e -> update());
 
 		menuPanel.add(keywordPanel);
@@ -425,12 +427,15 @@ ProjectEventListener
 		return topPanel;
 	}
 
-	private JSeparator getSeparator(){
-		return new JSeparator(SwingConstants.VERTICAL){
-			@Override public Dimension getPreferredSize() {
+	private JSeparator getSeparator() {
+		return new JSeparator(SwingConstants.VERTICAL) {
+			@Override
+			public Dimension getPreferredSize() {
 				return new Dimension(1, 16);
 			}
-			@Override public Dimension getMaximumSize() {
+
+			@Override
+			public Dimension getMaximumSize() {
 				return this.getPreferredSize();
 			}
 		};
@@ -445,16 +450,16 @@ ProjectEventListener
 		logger.log(Level.INFO, () -> "notesTable select (" + row + "," + col + ")");
 
 		try {
-			if(lastSelectedDiagram != null) {
+			if (lastSelectedDiagram != null) {
 				diagramViewManager.clearAllViewProperties(lastSelectedDiagram);
 			}
 
 			// 未選択状態
-			if(row < 0) {
+			if (row < 0) {
 				return;
 			}
 
-			Link link = (Link)linksTable.getValueAt(row, 0);
+			Link link = (Link) linksTable.getValueAt(row, 0);
 
 			diagramViewManager.open(link.diagram);
 			diagramViewManager.unselectAll();
@@ -465,25 +470,30 @@ ProjectEventListener
 			lastSelectedDiagram = link.diagram;
 
 			diagramViewManager.getViewProperties(link.presentation).keySet().stream()
-			.forEach(k -> {
-				try {
-					String message = "key:" + k + "=" + diagramViewManager.getViewProperty(link.presentation, k);
-					logger.log(Level.INFO, () -> message);
-				}catch(InvalidUsingException e) {
-					e.printStackTrace();
-				}
-			});
+					.forEach(k -> {
+						try {
+							String message = "key:" + k + "="
+									+ diagramViewManager.getViewProperty(link.presentation, k);
+							logger.log(Level.INFO, () -> message);
+						} catch (InvalidUsingException e) {
+							e.printStackTrace();
+						}
+					});
 
 			diagramViewManager.setViewProperty(
 					link.presentation,
 					IDiagramViewManager.BORDER_COLOR,
 					Color.MAGENTA);
 
-		}catch(InvalidUsingException e) {
+			diagramViewManager.setViewProperty(
+					link.presentation,
+					IDiagramViewManager.LINE_COLOR,
+					Color.MAGENTA);
+
+		} catch (InvalidUsingException e) {
 			e.printStackTrace();
 		}
 	}
-
 
 	private void getPresentationsInAllDiagramsWithLabel(String keyword) {
 		try {
@@ -499,7 +509,7 @@ ProjectEventListener
 
 			getPresentationsWithLabel(ds, keyword);
 
-		}catch(Exception e) {
+		} catch (Exception e) {
 			logger.log(Level.WARNING, e.getMessage(), e);
 		}
 	}
@@ -513,7 +523,7 @@ ProjectEventListener
 			}
 
 			List<IPackage> ps = new ArrayList<>();
-			ps.add((IPackage)d.getOwner());
+			ps.add((IPackage) d.getOwner());
 
 			List<IDiagram> ds = ps.stream()
 					.flatMap(p -> Stream.of(p.getDiagrams()))
@@ -521,7 +531,7 @@ ProjectEventListener
 
 			getPresentationsWithLabel(ds, keyword);
 
-		}catch(Exception e) {
+		} catch (Exception e) {
 			logger.log(Level.WARNING, e.getMessage(), e);
 		}
 	}
@@ -539,7 +549,7 @@ ProjectEventListener
 
 			getPresentationsWithLabel(ds, keyword);
 
-		}catch(Exception e) {
+		} catch (Exception e) {
 			logger.log(Level.WARNING, e.getMessage(), e);
 		}
 	}
@@ -548,61 +558,61 @@ ProjectEventListener
 		links = new ArrayList<>();
 		try {
 			// ダイアグラムを巡回
-			for(IDiagram d : ds) {
+			for (IDiagram d : ds) {
 
 				// 色選択の場合
-				if (! searchColors.getSelectedItem().equals(SEARCH_FONT.COLOR_ALL.text)) {
+				if (!searchColors.getSelectedItem().equals(SEARCH_FONT.COLOR_ALL.text)) {
 					// Presentationを登録
 					Stream.of(d.getPresentations())
-					.filter(p -> filterType(p.getType()))
-					.filter(p -> filterLabel(p.getLabel(), keyword))
-					.filter(this::filterFontColor)
-					.forEach(p -> links.add(new Link(p, d)));
+							.filter(p -> filterType(p.getType()))
+							.filter(p -> filterLabel(p.getLabel(), keyword))
+							.filter(this::filterFontColor)
+							.forEach(p -> links.add(new Link(p, d)));
 				}
 				// 色選択でない場合
 				else {
 					// Presentationを登録
 					Stream.of(d.getPresentations())
-					.filter(p -> filterType(p.getType()))
-					.filter(p -> filterLabel(p.getLabel(), keyword))
-					.forEach(p -> links.add(new Link(p, d)));
+							.filter(p -> filterType(p.getType()))
+							.filter(p -> filterLabel(p.getLabel(), keyword))
+							.forEach(p -> links.add(new Link(p, d)));
 
 					// 全てを選択した場合には、クラス要素とステレオタイプを登録
 					Stream.of(d.getPresentations())
-					.filter(p -> searchTypes.getSelectedItem().equals(SEARCH_TYPE.ALL.text))
-					.forEach(p -> {
-						// クラスの場合にはメソッドと属性を確認
-						if(p.getType().equals("Class")) {
-							IClass c = (IClass)p.getModel();
+							.filter(p -> searchTypes.getSelectedItem().equals(SEARCH_TYPE.ALL.text))
+							.forEach(p -> {
+								// クラスの場合にはメソッドと属性を確認
+								if (p.getType().equals("Class")) {
+									IClass c = (IClass) p.getModel();
 
-							// メソッド
-							Stream.of(c.getOperations())
-							.filter(o -> filterLabel(o.getName(), keyword))
-							.forEach(o -> links.add(new Link(o.getName(), p, d)));
+									// メソッド
+									Stream.of(c.getOperations())
+											.filter(o -> filterLabel(o.getName(), keyword))
+											.forEach(o -> links.add(new Link(o.getName(), p, d)));
 
-							// 属性
-							Stream.of(c.getAttributes())
-							.filter(a -> filterLabel(a.getName(), keyword))
-							.forEach(a -> links.add(new Link(a.getName(), p, d)));
-						}
+									// 属性
+									Stream.of(c.getAttributes())
+											.filter(a -> filterLabel(a.getName(), keyword))
+											.forEach(a -> links.add(new Link(a.getName(), p, d)));
+								}
 
-						// ステレオタイプを確認
-						if(p.getModel() != null) {
-							Stream.of(p.getModel().getStereotypes())
-							.filter(s -> filterLabel(s, keyword))
-							.forEach(s -> links.add(new Link(s, p, d)));
-						}
-					});
+								// ステレオタイプを確認
+								if (p.getModel() != null) {
+									Stream.of(p.getModel().getStereotypes())
+											.filter(s -> filterLabel(s, keyword))
+											.forEach(s -> links.add(new Link(s, p, d)));
+								}
+							});
 				}
 			}
-		} catch(Exception e) {
+		} catch (Exception e) {
 			logger.log(Level.WARNING, e.getMessage(), e);
 		}
 
 	}
 
 	private boolean filterType(String type) {
-		if(type == null) {
+		if (type == null) {
 			return false;
 		}
 
@@ -611,22 +621,22 @@ ProjectEventListener
 	}
 
 	private boolean filterLabel(String label, String keyword) {
-		if(label == null || keyword == null){
+		if (label == null || keyword == null) {
 			return false;
 		}
 
-		if(label.isEmpty()) {
+		if (label.isEmpty()) {
 			return false;
 		}
 
-		if(keyword.isEmpty()) {
+		if (keyword.isEmpty()) {
 			return true;
 		}
 
-		if(searchOptions.getSelectedItem().equals(SEARCH_OPTION.STARTSWITH.text)) {
+		if (searchOptions.getSelectedItem().equals(SEARCH_OPTION.STARTSWITH.text)) {
 			return label.toLowerCase().startsWith(keyword.toLowerCase());
 
-		} else if(searchOptions.getSelectedItem().equals(SEARCH_OPTION.CONTAINS.text)){
+		} else if (searchOptions.getSelectedItem().equals(SEARCH_OPTION.CONTAINS.text)) {
 			return label.toLowerCase().contains(keyword.toLowerCase());
 
 		} else {
@@ -635,15 +645,15 @@ ProjectEventListener
 	}
 
 	private boolean filterFontColor(IPresentation p) {
-		if(searchColors.getSelectedItem().equals(SEARCH_FONT.COLOR_ALL.text)) {
+		if (searchColors.getSelectedItem().equals(SEARCH_FONT.COLOR_ALL.text)) {
 			return true;
 		}
 
 		String fontColor = p.getProperty(PROPERTY_FONT_COLOR);
-		if(searchColors.getSelectedItem().equals(SEARCH_FONT.COLOR_MATCH.text)){
+		if (searchColors.getSelectedItem().equals(SEARCH_FONT.COLOR_MATCH.text)) {
 			return selectedFontColor.equals(fontColor);
 		} else {
-			return ! selectedFontColor.equals(fontColor);
+			return !selectedFontColor.equals(fontColor);
 		}
 	}
 
@@ -651,8 +661,8 @@ ProjectEventListener
 		INamedElement[] iNamedElements = iPackage.getOwnedElements();
 		for (INamedElement iNamedElement : iNamedElements) {
 			if (iNamedElement instanceof IPackage) {
-				iPackages.add((IPackage)iNamedElement);
-				getPackages((IPackage)iNamedElement, iPackages);
+				iPackages.add((IPackage) iNamedElement);
+				getPackages((IPackage) iNamedElement, iPackages);
 			}
 		}
 	}
@@ -664,9 +674,9 @@ ProjectEventListener
 		try {
 			logger.log(Level.INFO, "update view.");
 
-			if(searchDiagrams.getSelectedItem().equals(SEARCH_DIAGRAM.CURRENT.text)){
+			if (searchDiagrams.getSelectedItem().equals(SEARCH_DIAGRAM.CURRENT.text)) {
 				getPresentationsInCurrentDiagramWithLabel(keywordTextField.getText());
-			} else if(searchDiagrams.getSelectedItem().equals(SEARCH_DIAGRAM.PACKAGE.text)){
+			} else if (searchDiagrams.getSelectedItem().equals(SEARCH_DIAGRAM.PACKAGE.text)) {
 				getPresentationsInDiagramsOfSamePackageWithLabel(keywordTextField.getText());
 			} else {
 				getPresentationsInAllDiagramsWithLabel(keywordTextField.getText());
@@ -676,17 +686,17 @@ ProjectEventListener
 
 			logger.log(Level.INFO, () -> "links.size=" + links.size());
 			links.stream()
-			.map(l -> {
-				String type  = l.presentation.getType();
-				String name  = l.diagram.getName();
-				String path  = l.getPackageName();
-				return new Object[] {l, type, name, path};
-			})
-			.forEach(tableModel::addRow);
+					.map(l -> {
+						String type = l.presentation.getType();
+						String name = l.diagram.getName();
+						String path = l.getPackageName();
+						return new Object[] { l, type, name, path };
+					})
+					.forEach(tableModel::addRow);
 
 			tableModel.fireTableDataChanged();
 
-		}catch(Exception e){
+		} catch (Exception e) {
 			logger.log(Level.WARNING, e.getMessage(), e);
 		}
 	}
@@ -710,6 +720,7 @@ ProjectEventListener
 	// ProjectEventListener
 	/**
 	 * 図が編集されたら表示を更新する
+	 * 
 	 * @see com.change_vision.jude.api.inf.project.ProjectEventListener#projectChanged(com.change_vision.jude.api.inf.project.ProjectEvent)
 	 */
 	@Override
@@ -748,18 +759,17 @@ ProjectEventListener
 		removeDiagramListeners();
 	}
 
-	private void addDiagramListeners(){
+	private void addDiagramListeners() {
 		diagramViewManager.addDiagramEditorSelectionListener(this);
 		diagramViewManager.addEntitySelectionListener(this);
 		projectAccessor.addProjectEventListener(this);
 	}
 
-	private void removeDiagramListeners(){
+	private void removeDiagramListeners() {
 		diagramViewManager.removeDiagramEditorSelectionListener(this);
 		diagramViewManager.removeEntitySelectionListener(this);
 		projectAccessor.removeProjectEventListener(this);
 	}
-
 
 	@Override
 	public Component getComponent() {
@@ -775,6 +785,5 @@ ProjectEventListener
 	public String getTitle() {
 		return title;
 	}
-
 
 }
